@@ -1,0 +1,7 @@
+[Desktop Entry]
+Type=Service
+ServiceTypes=Krita/PythonPlugin
+X-KDE-Library=kra2animate
+X-Python-2-Compatible=false
+Name=Krita <-> Adobe Animate
+Comment=Exporta capas y fotogramas para Adobe Animate e importa lo exportado desde Animate

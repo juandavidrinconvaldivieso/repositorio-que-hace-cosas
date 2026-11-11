@@ -1,0 +1,12 @@
+VSVersionInfo(
+  ffi=FixedFileInfo(filevers=(2, 5, 1, 0), prodvers=(2, 5, 1, 0), mask=0x3f, flags=0x0, OS=0x40004, fileType=0x1, subtype=0x0, date=(0, 0)),
+  kids=[StringFileInfo([StringTable('040A04B0', [
+    StringStruct('CompanyName', 'Wind OS'),
+    StringStruct('FileDescription', 'Wind OS Messenger'),
+    StringStruct('FileVersion', '2.5.1'),
+    StringStruct('InternalName', 'WindOSMessenger'),
+    StringStruct('LegalCopyright', 'Wind OS'),
+    StringStruct('OriginalFilename', 'Wind OS Messenger.exe'),
+    StringStruct('ProductName', 'Wind OS Messenger'),
+    StringStruct('ProductVersion', '2.5.1')])]),
+    VarFileInfo([VarStruct('Translation', [1034, 1200])])])

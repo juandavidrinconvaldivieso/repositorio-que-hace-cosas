@@ -1,0 +1,124 @@
+/* Estilos de la app: «Oscuro (tipo Discord)» y «Claro (tipo Instagram)». El estilo Aero es el de aero.css. */
+body.skin-discord {
+  --bg: #313338; --panel: #2b2d31; --surface: #383a40; --surface2: #35373c; --sel: #404249; --line: #1f2023;
+  --text: #dbdee1; --muted: #949ba4; --btn: #5865f2; --input: #1e1f22; --top: #1e1f22; --accent: #f2f3f5 !important;
+}
+body.skin-insta {
+  --bg: #fafafa; --panel: #ffffff; --surface: #ffffff; --surface2: #f2f2f2; --sel: #efefef; --line: #dbdbdb;
+  --text: #262626; --muted: #8e8e8e; --btn: #0095f6; --input: #fafafa; --top: #ffffff; --accent: #262626 !important;
+}
+:is(.skin-discord, .skin-insta) { background: var(--bg) !important; color: var(--text); font-family: "Segoe UI", system-ui, sans-serif; }
+:is(.skin-discord, .skin-insta) :is(#scene, #bubbles) { display: none; }
+:is(.skin-discord, .skin-insta) .window { background: var(--bg) !important; backdrop-filter: none; border: none; box-shadow: none; padding: 0; }
+:is(.skin-discord, .skin-insta) .window::before { display: none; }
+:is(.skin-discord, .skin-insta) .window > .titlebar { background: var(--top); border-bottom: 1px solid var(--line); }
+:is(.skin-discord, .skin-insta) .titlebar .t { color: var(--text) !important; text-shadow: none !important; padding-left: 4px; }
+:is(.skin-discord, .skin-insta) .titlebar .ico { box-shadow: none; }
+:is(.skin-discord, .skin-insta) .cap { background: transparent; border: none; box-shadow: none; color: var(--muted); text-shadow: none; height: 29px; width: 40px; font-weight: 400; border-radius: 0 !important; }
+:is(.skin-discord, .skin-insta) .cap:hover { background: var(--surface2); color: var(--text); }
+:is(.skin-discord, .skin-insta) .cap.close:hover { background: #e81123; color: #fff; box-shadow: none; }
+:is(.skin-discord, .skin-insta) .content { border: none; box-shadow: none; background: var(--bg); }
+:is(.skin-discord, .skin-insta) .menu { background: var(--top); border-bottom: 1px solid var(--line); }
+:is(.skin-discord, .skin-insta) .menu span { color: var(--muted); }
+:is(.skin-discord, .skin-insta) .menu span:hover { background: var(--surface2); border-color: transparent; color: var(--text); }
+:is(.skin-discord, .skin-insta) :is(.glasshead, .top) { background: var(--panel) !important; color: var(--text); text-shadow: none; border-bottom: 1px solid var(--line); }
+:is(.skin-discord, .skin-insta) :is(#meStatus, #meMsg) { background: var(--input); color: var(--text); border: 1px solid var(--line); text-shadow: none; border-radius: 6px; }
+:is(.skin-discord, .skin-insta) #meStatus option { background: var(--panel); color: var(--text); }
+:is(.skin-discord, .skin-insta) #meMsg::placeholder { color: var(--muted); }
+:is(.skin-discord, .skin-insta) #meName:hover { background: var(--surface2); }
+:is(.skin-discord, .skin-insta) .codebox { background: var(--surface); border: 1px solid var(--line); box-shadow: none; color: var(--text); border-radius: 10px; }
+:is(.skin-discord, .skin-insta) .gbtn { background: var(--surface2); color: var(--text); border: 1px solid var(--line); text-shadow: none; border-radius: 6px; }
+:is(.skin-discord, .skin-insta) .gbtn:hover { background: var(--sel); }
+:is(.skin-discord, .skin-insta) :is(.left, .right) { background: var(--panel) !important; border-color: var(--line) !important; }
+:is(.skin-discord, .skin-insta) .ltabs { background: var(--panel); border-color: var(--line); }
+:is(.skin-discord, .skin-insta) .ltabs > span { color: var(--muted); }
+:is(.skin-discord, .skin-insta) .ltabs > span.on { background: var(--surface); border-color: var(--line); color: var(--text); }
+:is(.skin-discord, .skin-insta) .ltools { border-color: var(--line); }
+:is(.skin-discord, .skin-insta) .group { color: var(--muted) !important; text-transform: uppercase; font-size: 11px; letter-spacing: .4px; }
+:is(.skin-discord, .skin-insta) .contact { color: var(--text); border-radius: 6px; }
+:is(.skin-discord, .skin-insta) .contact:hover { background: var(--surface2); border-color: transparent; }
+:is(.skin-discord, .skin-insta) .contact.sel { background: var(--sel); border-color: transparent; }
+:is(.skin-discord, .skin-insta) .contact.off .nm { color: var(--muted); }
+:is(.skin-discord, .skin-insta) :is(.contact .pm, .tm, .empty, .typing, .sys, .m .w, .m .ts, .pmeta, .fdesc, .cs, .cp, .welcome .tip) { color: var(--muted) !important; }
+:is(.skin-discord, .skin-insta) .small:not(.btn):not(.bigbtn) { color: var(--muted); }
+:is(.skin-discord, .skin-insta) .req { background: var(--sel); border-color: var(--line); }
+:is(.skin-discord, .skin-insta) .center { background: var(--bg) !important; }
+:is(.skin-discord, .skin-insta) :is(.chead, .fhead, .replybox) { background: var(--bg); border-color: var(--line); }
+:is(.skin-discord, .skin-insta) :is(.chead .cn, .fname, .tt, .ptitle, .pname, .fph b, .cmt b, .welcome h2, .hfilter, .welcome p, .psec p, .chip, .mesub, .pstat, .pmsg) { color: var(--text) !important; }
+:is(.skin-discord, .skin-insta) .conv { background: var(--bg) !important; border: none !important; }
+:is(.skin-discord, .skin-insta) :is(input[type=text], input[type=password], textarea, select.field) { background: var(--input); color: var(--text); border: 1px solid var(--line); border-radius: 8px; }
+:is(.skin-discord, .skin-insta) .btn { background: var(--surface2); color: var(--text); border: 1px solid var(--line); border-radius: 6px; box-shadow: none; }
+:is(.skin-discord, .skin-insta) .btn:hover { background: var(--sel); border-color: var(--line); }
+:is(.skin-discord, .skin-insta) :is(.bigbtn, .addbtn) { background: var(--btn); color: #fff; border: none; box-shadow: none; text-shadow: none; border-radius: 8px; }
+:is(.skin-discord, .skin-insta) :is(.bigbtn, .addbtn):hover { filter: brightness(1.1); }
+:is(.skin-discord, .skin-insta) :is(.psec, .tcard, .post, .fpost, .hcomp, .hsec, .ecard, .newtopic, .hme, .lcard, .att:not(.player), .bigcode, .pchip, .webtoast) { background: var(--surface); border-color: var(--line); color: var(--text); box-shadow: none; }
+:is(.skin-discord, .skin-insta) .psec.hl { background: var(--sel); }
+:is(.skin-discord, .skin-insta) :is(.psec h4, .hst) { color: var(--muted); }
+:is(.skin-discord, .skin-insta) .tag { background: var(--btn); }
+:is(.skin-discord, .skin-insta) .status { background: var(--top); border-color: var(--line); color: var(--muted); }
+:is(.skin-discord, .skin-insta) .dialog { background: var(--panel); border: 1px solid var(--line); box-shadow: 0 10px 40px rgba(0,0,0,.45); padding: 0; border-radius: 10px; overflow: hidden; }
+:is(.skin-discord, .skin-insta) .dialog .titlebar { background: var(--panel); }
+:is(.skin-discord, .skin-insta) .dialog .inner { background: var(--panel); border: none; color: var(--text); }
+:is(.skin-discord, .skin-insta) .dialog .foot { background: var(--surface2); border-color: var(--line); }
+:is(.skin-discord, .skin-insta) :is(.tabs, .ptabs) { background: var(--panel); border-color: var(--line); }
+:is(.skin-discord, .skin-insta) :is(.tabs span, .ptabs span) { color: var(--muted); }
+:is(.skin-discord, .skin-insta) :is(.tabs span.on, .ptabs span.on) { background: var(--surface); color: var(--text); border-color: var(--line); }
+:is(.skin-discord, .skin-insta) :is(.optchip, .avopt, .privopt label) { background: var(--surface); color: var(--text); border-color: var(--line); }
+:is(.skin-discord, .skin-insta) :is(.optchip.on, .avopt.on) { background: var(--sel); border-color: var(--btn); }
+:is(.skin-discord, .skin-insta) :is(.optchip, .avopt):hover { background: var(--sel); }
+:is(.skin-discord, .skin-insta) .lk { color: var(--muted); }
+:is(.skin-discord, .skin-insta) .lk:hover { background: var(--surface2); border-color: transparent; }
+:is(.skin-discord, .skin-insta) :is(.fpa, .fcm) { border-color: var(--line); }
+:is(.skin-discord, .skin-insta) :is(.htag, .ext, .pact a, .tm a, .hhint a) { color: var(--btn); }
+:is(.skin-discord, .skin-insta) :is(.popup, .scm) { background: var(--panel); border-color: var(--line); color: var(--text); }
+:is(.skin-discord, .skin-insta) #attmenu > div[data-k]:hover { background: var(--surface2); }
+:is(.skin-discord, .skin-insta) .callpanel { background: var(--panel); border: 1px solid var(--line); box-shadow: 0 10px 30px rgba(0,0,0,.45); color: var(--text); backdrop-filter: none; }
+:is(.skin-discord, .skin-insta) .cpwho { background: var(--surface2); }
+:is(.skin-discord, .skin-insta) .cpb { background: var(--surface2); border-color: var(--line); color: var(--text); }
+:is(.skin-discord, .skin-insta) .cpb.go { background: #23a55a; color: #fff; }
+:is(.skin-discord, .skin-insta) .cpb.stop { background: #f23f43; color: #fff; }
+:is(.skin-discord, .skin-insta) :is(.authbox, .dchip) { background: var(--panel); color: var(--text); border: 1px solid var(--line); box-shadow: 0 10px 40px rgba(0,0,0,.35); text-shadow: none; }
+:is(.skin-discord, .skin-insta) .authbox h1 { color: var(--text); }
+:is(.skin-discord, .skin-insta) .auth { background: rgba(0,0,0,.4); }
+:is(.skin-discord, .skin-insta) .bigcode { color: var(--text); }
+/* Avatares redondos, sin el marco brillante */
+:is(.skin-discord, .skin-insta) .avatar { border-radius: 50% !important; padding: 0 !important; background: transparent !important; box-shadow: none; }
+:is(.skin-discord, .skin-insta) .avatar::after { display: none; }
+:is(.skin-discord, .skin-insta) .avatar img { border-radius: 50% !important; border: none; }
+:is(.skin-discord, .skin-insta) .avatar.ficon, :is(.skin-discord, .skin-insta) .avatar.ficon img { border-radius: 28% !important; }
+
+/* --- Oscuro (tipo Discord) --- */
+.skin-discord .avatar.s-online { box-shadow: 0 0 0 2px var(--panel), 0 0 0 4px #23a55a; }
+.skin-discord .avatar.s-busy { box-shadow: 0 0 0 2px var(--panel), 0 0 0 4px #f23f43; }
+.skin-discord .avatar.s-away { box-shadow: 0 0 0 2px var(--panel), 0 0 0 4px #f0b232; }
+.skin-discord .m .tx[style] { color: var(--text) !important; }
+.skin-discord .m { padding: 2px 6px; border-radius: 4px; }
+.skin-discord .m:hover { background: #2e3035; }
+.skin-discord .left { background: #2b2d31 !important; }
+.skin-discord .ltabs > span.on { background: #404249; }
+.skin-discord .group { font-weight: 700; }
+.skin-discord .chead { box-shadow: 0 1px 0 rgba(0,0,0,.25); }
+.skin-discord .badge { background: #f23f43; box-shadow: none; }
+.skin-discord .lk.on { color: #f23f43; }
+.skin-discord ::-webkit-scrollbar { width: 10px; } .skin-discord ::-webkit-scrollbar-thumb { background: #1a1b1e; border-radius: 6px; }
+.skin-discord ::-webkit-scrollbar-track { background: #2b2d31; }
+.skin-discord .dialog .icon { background: #5865f2; }
+
+/* --- Claro (tipo Instagram) --- */
+.skin-insta .titlebar .t { font-family: "Segoe Script", "Brush Script MT", cursive; font-size: 15px; font-weight: 600; }
+.skin-insta .avatar:not(.ficon):not(.s-offline) { padding: 2px !important; background: linear-gradient(45deg, #feda75, #fa7e1e, #d62976, #962fbf, #4f5bd5) !important; }
+.skin-insta .avatar:not(.ficon):not(.s-offline) img { border: 2px solid #fff !important; }
+.skin-insta .avatar.s-offline { padding: 2px !important; background: #dbdbdb !important; }
+.skin-insta .ltabs > span.on { background: #fff; border-bottom: 2px solid #262626; font-weight: 700; }
+.skin-insta .fpost { border-radius: 8px; }
+.skin-insta .lk.on { color: #ed4956; }
+.skin-insta .badge { background: #ff3040; box-shadow: none; }
+.skin-insta .codebox .code { font-family: "Segoe UI", sans-serif; letter-spacing: .5px; }
+.skin-insta .bigbtn { border-radius: 8px; font-weight: 600; }
+.skin-insta .tag { background: #262626; }
+.skin-insta .contact.sel { background: #efefef; }
+.skin-insta .dialog .icon { background: linear-gradient(45deg, #fa7e1e, #d62976, #4f5bd5); }
+:is(.skin-discord, .skin-insta) :is(.pane label, .pane .lbl, .checks label, .row label, .hshort, .dialog .msg) { color: var(--text); }
+:is(.skin-discord, .skin-insta) .pane .lbl { color: var(--muted); }
+:is(.skin-discord, .skin-insta) .skinopt { background: var(--surface); color: var(--text); border-color: var(--line); }
+:is(.skin-discord, .skin-insta) .skinopt.on { border-color: var(--btn); }

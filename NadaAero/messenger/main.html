@@ -1,0 +1,187 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Nada Messenger</title>
+<link rel="stylesheet" href="aero.css">
+<style>
+  .me { display: flex; gap: 10px; padding: 12px 10px; align-items: center; }
+  .meinfo { flex: 1; min-width: 0; }
+  .mename { display: flex; align-items: center; gap: 6px; }
+  #meName { font-weight: 600; font-size: 15px; outline: none; padding: 0 3px; border-radius: 2px; max-width: 130px; overflow: hidden; white-space: nowrap; cursor: text; }
+  #meName:focus { background: #fff; color: #000; text-shadow: none; }
+  #meStatus { font: 12px "Segoe UI", sans-serif; color: #fff; background: rgba(255,255,255,.2); border: 1px solid rgba(255,255,255,.45); border-radius: 3px; text-shadow: inherit; }
+  #meStatus option { color: #000; }
+  #meMsg { width: 100%; margin-top: 6px; font: italic 12px "Segoe UI", sans-serif; border: 1px solid rgba(255,255,255,.35); background: rgba(255,255,255,.18); color: #fff; padding: 3px 5px; border-radius: 2px; text-shadow: inherit; }
+  #meMsg::placeholder { color: rgba(255,255,255,.9); }
+  #meMsg:focus { background: #fff; color: #333; border-color: #7eb4ea; outline: none; text-shadow: none; }
+
+  .search { flex: none; padding: 6px 8px; background: linear-gradient(#f4f8fd, #e3ecf7); border-bottom: 1px solid #c5d5e8; }
+  .search input { width: 100%; padding: 3px 6px; border: 1px solid #abadb3; border-radius: 2px; font: 12px "Segoe UI", sans-serif; }
+  .search input:focus { border-color: #3d7bad; outline: none; }
+
+  .list { flex: 1; overflow-y: auto; background: #fff; padding: 4px 0; }
+  .group { padding: 5px 8px 3px; color: #1e3287; font-weight: 600; display: flex; align-items: center; gap: 4px; }
+  .group:hover { color: #3d7bad; }
+  .group .arr { display: inline-block; width: 12px; font-size: 9px; transition: transform .15s; }
+  .group.closed .arr { transform: rotate(-90deg); }
+  .contact { display: flex; align-items: center; gap: 6px; padding: 3px 8px 3px 20px; margin: 0 3px; border: 1px solid transparent; border-radius: 3px; white-space: nowrap; overflow: hidden; }
+  .contact:hover { background: linear-gradient(#f2f8fe, #dceefc); border-color: #b8d6fb; }
+  .contact.sel { background: linear-gradient(#dcebfc, #c1dcfc); border-color: #7da2ce; }
+  .contact .pm { color: #888; font-style: italic; overflow: hidden; text-overflow: ellipsis; }
+  .contact.off .nm { color: #777; }
+  .empty { padding: 10px 20px; color: #888; font-style: italic; }
+
+  .ad { flex: none; cursor: pointer; padding: 8px 10px; color: #fff; text-shadow: 0 1px 2px rgba(0,60,0,.6); font-size: 12px; position: relative;
+    border-top: 1px solid #2f8a1c;
+    background: linear-gradient(#b6f28a 0%, #63c43a 48%, #3aa522 50%, #6fd146 100%); transition: filter .15s; }
+  .ad:hover { filter: brightness(1.08); }
+  .ad small { position: absolute; right: 6px; top: 2px; font-size: 9px; opacity: .85; }
+  .ad b { display: block; font-size: 13px; }
+</style>
+</head>
+<body>
+  <div class="ray"></div><div class="sun"></div><div class="hill back"></div><div class="hill front"></div>
+  <div id="bubbles"></div>
+
+  <div class="window">
+    <div class="titlebar pywebview-drag-region" id="title">
+      <div class="ico"></div>
+      <div class="t">Nada Messenger</div>
+      <div class="caps">
+        <div class="cap" id="bMin" title="Minimizar">_</div>
+        <div class="cap" id="bMax" title="Maximizar">□</div>
+        <div class="cap close" id="bClose" title="Cerrar">✕</div>
+      </div>
+    </div>
+    <div class="content">
+      <div class="menu" id="menu"><span>Archivo</span><span>Contactos</span><span>Acciones</span><span>Herramientas</span><span>Ayuda</span></div>
+
+      <div class="me glasshead">
+        <div id="meAvatar"></div>
+        <div class="meinfo">
+          <div class="mename">
+            <span id="meName" contenteditable="true" spellcheck="false" title="Haz clic para cambiar tu nombre">Yo</span>
+            <select id="meStatus">
+              <option value="online">Disponible</option>
+              <option value="busy">Ocupado</option>
+              <option value="away">Ausente</option>
+              <option value="offline">Desconectado</option>
+            </select>
+          </div>
+          <input id="meMsg" maxlength="80" placeholder="Comparte una nada..." spellcheck="false">
+        </div>
+      </div>
+
+      <div class="search"><input id="q" placeholder="Buscar contactos..." spellcheck="false"></div>
+      <div class="list" id="list"></div>
+      <div class="ad" id="ad"><small>Publicidad</small><b id="adT"></b><span id="adS"></span></div>
+      <div class="status"><span id="st">Has iniciado sesión.</span><span id="cnt"></span></div>
+    </div>
+  </div>
+
+<script src="common.js"></script>
+<script>
+  // ---------- Tu perfil ----------
+  let me = { name: 'Yo', status: 'online', msg: '' };
+  try { Object.assign(me, JSON.parse(localStorage.getItem('nada-me') || '{}')); } catch (e) {}
+
+  function saveMe() {
+    try { localStorage.setItem('nada-me', JSON.stringify(me)); } catch (e) {}
+    if (api()) api().set_me(me);
+  }
+  function renderMe() {
+    $('meAvatar').innerHTML = avatarHtml(ME_PIC, me.status, 64);
+    $('meName').textContent = me.name;
+    $('meStatus').value = me.status;
+    $('meMsg').value = me.msg;
+  }
+  $('meName').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); e.target.blur(); } });
+  $('meName').addEventListener('blur', () => { me.name = $('meName').textContent.trim().slice(0, 30) || 'Yo'; renderMe(); saveMe(); });
+  $('meStatus').onchange = () => {
+    me.status = $('meStatus').value; renderMe(); saveMe();
+    $('st').textContent = me.status === 'offline' ? 'Apareces desconectado. A nadie le importa.' : 'Tu estado: ' + STATUS[me.status] + '.';
+  };
+  $('meMsg').addEventListener('change', () => { me.msg = $('meMsg').value; saveMe(); });
+  $('meMsg').addEventListener('keydown', e => { if (e.key === 'Enter') e.target.blur(); });
+
+  // ---------- Lista de contactos ----------
+  const collapsed = new Set();
+  let selected = null;
+
+  function renderList() {
+    const q = $('q').value.trim().toLowerCase();
+    const ids = Object.keys(CONTACTS);
+    const groups = [
+      ['on', 'Disponibles', ids.filter(id => CONTACTS[id].status !== 'offline')],
+      ['off', 'Desconectados', ids.filter(id => CONTACTS[id].status === 'offline')]
+    ];
+    let html = '';
+    for (const [gid, label, all] of groups) {
+      const shown = all.filter(id => CONTACTS[id].name.toLowerCase().includes(q));
+      if (q && !shown.length) continue;
+      const closed = collapsed.has(gid);
+      html += `<div class="group ${closed ? 'closed' : ''}" data-g="${gid}"><span class="arr">▼</span>${label} (${shown.length}/${all.length})</div>`;
+      if (closed) continue;
+      for (const id of shown) {
+        const c = CONTACTS[id];
+        const pm = c.music ? '<span class="emo">🎵</span> ' + esc(c.music) : esc(c.msg || '');
+        html += `<div class="contact ${c.status === 'offline' ? 'off' : ''} ${selected === id ? 'sel' : ''}" data-id="${id}" title="${esc(c.name)} (${STATUS[c.status]})">
+          <span class="orb s-${c.status}"></span><span class="nm">${esc(c.name)}</span>${pm ? '<span class="pm">&nbsp;- ' + pm + '</span>' : ''}</div>`;
+      }
+    }
+    $('list').innerHTML = html || '<div class="empty">No se encontró a nadie. Ni siquiera a Nadie.</div>';
+    const online = ids.filter(id => CONTACTS[id].status !== 'offline').length;
+    $('cnt').textContent = `${online} contactos conectados`;
+  }
+
+  $('q').oninput = renderList;
+  $('list').addEventListener('click', e => {
+    const g = e.target.closest('.group');
+    if (g) { collapsed.has(g.dataset.g) ? collapsed.delete(g.dataset.g) : collapsed.add(g.dataset.g); return renderList(); }
+    const c = e.target.closest('.contact');
+    if (c) {  // sin redibujar, para no romper el doble clic
+      selected = c.dataset.id;
+      document.querySelectorAll('.contact.sel').forEach(el => el.classList.remove('sel'));
+      c.classList.add('sel');
+    }
+  });
+  $('list').addEventListener('dblclick', e => {
+    const c = e.target.closest('.contact');
+    if (c && api()) api().open_chat(c.dataset.id, CONTACTS[c.dataset.id].name);
+  });
+
+  // ---------- Publicidad inútil ----------
+  const ads = [
+    ['Nada Premium', 'Ahora con un 40% más de nada.'],
+    ['¿Te sientes solo?', 'Nadie te entiende. Habla con Nadie.'],
+    ['¡Descarga 0 emoticonos gratis!', 'Oferta válida hasta nunca.'],
+    ['¡Felicidades! Eres el visitante 0', 'Haz clic para no reclamar tu premio.'],
+    ['Fondos de pantalla con burbujas', 'Ya los tienes. Mira hacia arriba.']
+  ];
+  let adI = 0;
+  function showAd() { const [t, s] = ads[adI++ % ads.length]; $('adT').textContent = t; $('adS').textContent = s; }
+  showAd(); setInterval(showAd, 7000);
+  $('ad').onclick = () => dialog('Gracias por tu interés.<br>No ocurrirá absolutamente nada.', { title: 'Publicidad' });
+
+  // ---------- Menús ----------
+  const menus = {
+    'Archivo': 'Archivos recibidos: 0.<br>Archivos enviados: 0.<br>Archivos que importan: 0.',
+    'Contactos': 'Agregar un contacto: no hay nadie más. Ya tienes a Nadie.',
+    'Acciones': 'Acción disponible: ninguna.<br>Puedes hacer doble clic en un contacto para hablar con él (no servirá de nada).',
+    'Herramientas': 'Opciones &gt; Privacidad: nadie puede verte. Tampoco te están buscando.',
+    'Ayuda': '<b>Nada Messenger</b> versión 2009<br>© Nadie. Ningún derecho reservado.<br><br>Consejo: prueba a enviar un zumbido.'
+  };
+  $('menu').onclick = e => { if (e.target.tagName === 'SPAN') dialog(menus[e.target.textContent], { title: e.target.textContent }); };
+
+  wireCaps(() => dialog('¿Cerrar sesión en <b>Nada Messenger</b>?<br>Tus contactos no lo notarán.', {
+    icon: '?', buttons: [['Sí', () => api() && api().close_all()], ['No']]
+  }));
+
+  renderMe();
+  renderList();
+  startBubbles(1600);
+  onReady(() => api().set_me(me));
+</script>
+</body>
+</html>

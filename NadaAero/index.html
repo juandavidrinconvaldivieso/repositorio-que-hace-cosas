@@ -1,0 +1,390 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Nada.exe</title>
+<style>
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; overflow: hidden; }
+  body {
+    font-family: "Segoe UI", Tahoma, sans-serif;
+    font-size: 13px;
+    color: #1e1e1e;
+    background: linear-gradient(#0f6fc6 0%, #3fa6ef 35%, #9fdcff 65%, #e9f9ff 100%);
+    user-select: none;
+  }
+
+  /* ---------- Fondo Frutiger Aero ---------- */
+  .sun {
+    position: absolute; top: -120px; right: -80px; width: 520px; height: 520px; border-radius: 50%;
+    background: radial-gradient(circle, rgba(255,255,230,.95) 0%, rgba(255,255,200,.4) 30%, transparent 65%);
+  }
+  .ray {
+    position: absolute; top: 0; right: 0; width: 140%; height: 140%;
+    background: repeating-conic-gradient(from 200deg at 85% 5%, rgba(255,255,255,.10) 0 6deg, transparent 6deg 14deg);
+    pointer-events: none;
+  }
+  .hill {
+    position: absolute; border-radius: 50%;
+    box-shadow: inset 0 18px 30px rgba(255,255,255,.45);
+  }
+  .hill.back  { left: -20%; bottom: -55%; width: 90%;  height: 90%;  background: radial-gradient(ellipse at 50% 20%, #a6eb6a, #4cb52f 60%, #2d8a1c); }
+  .hill.front { right: -25%; bottom: -60%; width: 110%; height: 95%; background: radial-gradient(ellipse at 40% 15%, #c4f78a, #6ccc36 55%, #2f9a1f); }
+  .bubble {
+    position: absolute; bottom: -120px; border-radius: 50%;
+    background:
+      radial-gradient(circle at 30% 28%, rgba(255,255,255,.95) 0 8%, rgba(255,255,255,0) 22%),
+      radial-gradient(circle at 50% 50%, rgba(255,255,255,0) 55%, rgba(170,230,255,.35) 75%, rgba(255,255,255,.75) 100%);
+    border: 1px solid rgba(255,255,255,.35);
+    animation: rise linear infinite;
+    cursor: pointer;
+  }
+  @keyframes rise {
+    0%   { transform: translate(0, 0); }
+    50%  { transform: translate(30px, -60vh); }
+    100% { transform: translate(-20px, -130vh); }
+  }
+  .pop { animation: pop .25s ease-out forwards !important; }
+  @keyframes pop { to { transform: scale(1.6); opacity: 0; } }
+
+  /* ---------- Ventana tipo Aero ---------- */
+  .window {
+    position: absolute; width: 540px; max-width: calc(100vw - 32px);
+    border-radius: 8px; padding: 0 7px 7px;
+    background: linear-gradient(rgba(190,220,250,.62), rgba(110,165,215,.55));
+    backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(0,0,0,.55);
+    box-shadow: inset 0 0 0 1px rgba(255,255,255,.65), 0 12px 40px rgba(0,0,0,.45);
+    transition: opacity .25s, transform .25s;
+  }
+  .window::before { /* reflejo diagonal del cristal */
+    content: ""; position: absolute; inset: 0; border-radius: 8px; pointer-events: none;
+    background: linear-gradient(115deg, transparent 20%, rgba(255,255,255,.25) 28%, transparent 36%, transparent 60%, rgba(255,255,255,.15) 66%, transparent 72%);
+  }
+  .window.hidden { opacity: 0; transform: scale(.85) translateY(40px); pointer-events: none; }
+  .window.max { left: 0 !important; top: 0 !important; width: 100vw; max-width: 100vw; height: calc(100vh - 40px); border-radius: 0; }
+  .window.max .content { height: calc(100% - 30px); }
+  .window.shake { animation: shake .4s; }
+  @keyframes shake { 20%,60% { margin-left: -8px; } 40%,80% { margin-left: 8px; } }
+
+  .titlebar { height: 30px; display: flex; align-items: center; gap: 6px; cursor: default; position: relative; }
+  .titlebar .ico { width: 16px; height: 16px; border-radius: 50%; background: radial-gradient(circle at 35% 30%, #fff, #7fd3ff 40%, #1677c9); box-shadow: 0 0 0 1px rgba(0,0,0,.3); }
+  .titlebar .t { flex: 1; text-shadow: 0 0 10px #fff, 0 0 10px #fff, 0 0 6px #fff; }
+  .caps { display: flex; align-self: flex-start; margin-top: -1px; }
+  .cap {
+    width: 28px; height: 19px; border: 1px solid rgba(0,0,0,.55); border-top: 0;
+    background: linear-gradient(rgba(255,255,255,.55), rgba(255,255,255,.2) 50%, rgba(255,255,255,.05) 51%, rgba(255,255,255,.3));
+    box-shadow: inset 0 0 0 1px rgba(255,255,255,.5);
+    display: grid; place-items: center; color: #fff; font: bold 11px Tahoma; text-shadow: 0 0 2px #000, 0 0 2px #000;
+  }
+  .cap + .cap { border-left: 0; }
+  .cap:first-child { border-bottom-left-radius: 5px; }
+  .cap.close { width: 46px; border-bottom-right-radius: 5px; background: linear-gradient(#e8a493, #d0705a 50%, #c74727 51%, #d9783b); }
+  .cap:hover { background: linear-gradient(#bfe6ff, #6fc0f2 50%, #2d8fd9 51%, #63d0ff); }
+  .cap.close:hover { background: linear-gradient(#ffb6a5, #ef6a4d 50%, #e13b13 51%, #ff9c45); box-shadow: 0 0 12px #ff6a2a, inset 0 0 0 1px rgba(255,255,255,.5); }
+
+  .content {
+    background: #fff; border: 1px solid rgba(0,0,0,.45);
+    box-shadow: 0 0 0 1px rgba(255,255,255,.6);
+    display: flex; flex-direction: column;
+  }
+  .menu { display: flex; background: linear-gradient(#fdfeff, #e6eef9); border-bottom: 1px solid #b6c5da; padding: 1px 2px; }
+  .menu span { padding: 3px 8px; border: 1px solid transparent; border-radius: 3px; }
+  .menu span:hover { background: linear-gradient(#f2f8fe, #d9ecfc); border-color: #a8d2f5; }
+
+  .body { padding: 18px 22px; flex: 1; }
+  h1 { margin: 0 0 4px; font-weight: 400; font-size: 20px; color: #1e3287; }
+  .sub { color: #555; margin-bottom: 18px; }
+
+  .bigbtn {
+    display: block; margin: 0 auto 18px; padding: 12px 38px; font: 600 16px "Segoe UI", sans-serif; color: #fff;
+    border: 1px solid #1d6aa5; border-radius: 26px; cursor: pointer;
+    text-shadow: 0 -1px 0 rgba(0,0,0,.35);
+    background: linear-gradient(#a9e4ff 0%, #5cbcf2 48%, #2493dc 50%, #3fb5f5 100%);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.85), inset 0 -4px 10px rgba(160,240,255,.6), 0 3px 8px rgba(0,80,160,.35);
+    transition: filter .15s, transform .1s;
+  }
+  .bigbtn:hover { filter: brightness(1.1) saturate(1.15); }
+  .bigbtn:active { transform: translateY(1px); filter: brightness(.95); }
+  .bigbtn:disabled { filter: grayscale(.7) opacity(.7); cursor: wait; }
+
+  .progress { height: 16px; border: 1px solid #b2b2b2; border-radius: 3px; background: linear-gradient(#f3f3f3, #dcdcdc); overflow: hidden; position: relative; }
+  .fill { height: 100%; width: 0; position: relative; overflow: hidden;
+    background: linear-gradient(#a9f59b 0%, #3fd23a 45%, #06b025 50%, #22c42a 100%); transition: width .2s; }
+  .fill::after { content: ""; position: absolute; top: 0; bottom: 0; width: 80px; left: -80px;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,.75), transparent); animation: shine 1.6s linear infinite; }
+  @keyframes shine { to { left: 110%; } }
+  .ptxt { margin: 6px 0 16px; color: #333; min-height: 18px; }
+
+  fieldset { border: 1px solid #d5dfe5; border-radius: 4px; margin: 0; padding: 8px 12px 12px; }
+  legend { color: #1e3287; padding: 0 4px; }
+  .row { display: flex; align-items: center; gap: 10px; margin-top: 8px; flex-wrap: wrap; }
+  .row label { flex: 1; min-width: 160px; }
+  input[type=range] { flex: 1; min-width: 140px; }
+
+  .btn {
+    padding: 4px 16px; min-width: 76px; font: 13px "Segoe UI", sans-serif; cursor: pointer;
+    border: 1px solid #707070; border-radius: 3px;
+    background: linear-gradient(#f2f2f2 0%, #ebebeb 45%, #dddddd 50%, #cfcfcf 100%);
+    box-shadow: inset 0 0 0 1px rgba(255,255,255,.7);
+  }
+  .btn:hover { border-color: #3c7fb1; background: linear-gradient(#eaf6fd 0%, #d9f0fc 45%, #bee6fd 50%, #a7d9f5 100%); }
+  .btn:active { background: linear-gradient(#e5f4fc, #c4e5f6 50%, #98d1ef 51%, #68b3db); }
+
+  .status { display: flex; justify-content: space-between; padding: 3px 8px; border-top: 1px solid #c9d6e6; background: linear-gradient(#f4f8fd, #dfe9f5); color: #333; font-size: 12px; }
+
+  /* ---------- Diálogo ---------- */
+  .overlay { position: fixed; inset: 0; display: none; place-items: center; z-index: 50; }
+  .overlay.show { display: grid; }
+  .dialog { position: relative; width: 380px; max-width: calc(100vw - 32px); }
+  .dialog .body { display: flex; gap: 14px; padding: 18px; }
+  .dialog .icon { flex: none; width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center;
+    font: bold 20px Georgia, serif; color: #fff; background: radial-gradient(circle at 35% 30%, #9fd8ff, #2a7fd4 60%, #134f9b); box-shadow: 0 1px 3px rgba(0,0,0,.4); }
+  .dialog .foot { background: #f0f0f0; border-top: 1px solid #dfdfdf; padding: 10px 12px; display: flex; justify-content: flex-end; gap: 8px; }
+
+  /* ---------- Barra de tareas ---------- */
+  .taskbar {
+    position: fixed; left: 0; right: 0; bottom: 0; height: 40px; z-index: 40;
+    display: flex; align-items: center; gap: 6px; padding: 0 8px 0 4px;
+    background: linear-gradient(rgba(60,90,120,.55), rgba(20,35,55,.75));
+    backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+    border-top: 1px solid rgba(255,255,255,.35); box-shadow: inset 0 1px 0 rgba(0,0,0,.4);
+  }
+  .orb {
+    width: 38px; height: 38px; border-radius: 50%; cursor: pointer; flex: none; position: relative;
+    background: radial-gradient(circle at 50% 75%, #8ff5a0 0%, #1fb049 35%, #0b5a28 70%);
+    border: 1px solid rgba(0,0,0,.6);
+    box-shadow: inset 0 0 0 1px rgba(255,255,255,.4), 0 0 8px rgba(120,255,160,.5);
+  }
+  .orb::before { content: ""; position: absolute; left: 5px; right: 5px; top: 2px; height: 46%; border-radius: 50% 50% 45% 45%; background: linear-gradient(rgba(255,255,255,.8), rgba(255,255,255,.1)); }
+  .orb:hover { filter: brightness(1.25); box-shadow: inset 0 0 0 1px rgba(255,255,255,.5), 0 0 16px rgba(140,255,170,.9); }
+  .task {
+    height: 34px; padding: 0 14px; display: flex; align-items: center; gap: 6px; color: #fff; border-radius: 3px; cursor: pointer;
+    border: 1px solid rgba(255,255,255,.3); text-shadow: 0 0 4px #000;
+    background: linear-gradient(rgba(255,255,255,.25), rgba(255,255,255,.08) 50%, rgba(255,255,255,0) 51%, rgba(255,255,255,.12));
+  }
+  .task:hover { background: linear-gradient(rgba(140,210,255,.5), rgba(80,160,230,.3) 50%, rgba(40,120,200,.25) 51%, rgba(100,190,255,.4)); }
+  .task .ico { width: 16px; height: 16px; border-radius: 50%; background: radial-gradient(circle at 35% 30%, #fff, #7fd3ff 40%, #1677c9); }
+  .clock { margin-left: auto; color: #fff; text-align: center; font-size: 12px; line-height: 1.25; text-shadow: 0 0 4px #000; }
+
+  @media (max-width: 520px) {
+    .body { padding: 14px; }
+    .bigbtn { padding: 12px 24px; }
+  }
+</style>
+</head>
+<body>
+  <div class="ray"></div>
+  <div class="sun"></div>
+  <div class="hill back"></div>
+  <div class="hill front"></div>
+  <div id="bubbles"></div>
+
+  <!-- Ventana principal -->
+  <div class="window" id="win">
+    <div class="titlebar" id="drag">
+      <div class="ico"></div>
+      <div class="t">Nada.exe — Centro de Inutilidad</div>
+      <div class="caps">
+        <div class="cap" id="bMin">_</div>
+        <div class="cap" id="bMax">□</div>
+        <div class="cap close" id="bClose">✕</div>
+      </div>
+    </div>
+    <div class="content">
+      <div class="menu" id="menu">
+        <span>Archivo</span><span>Editar</span><span>Ver</span><span>Herramientas</span><span>Ayuda</span>
+      </div>
+      <div class="body">
+        <h1>Bienvenido a Nada.exe</h1>
+        <div class="sub">La aplicación líder en no hacer absolutamente nada, ahora con efecto cristal.</div>
+
+        <button class="bigbtn" id="go">Hacer nada</button>
+
+        <div class="progress"><div class="fill" id="fill"></div></div>
+        <div class="ptxt" id="ptxt">Listo para no hacer nada.</div>
+
+        <fieldset>
+          <legend>Opciones avanzadas (irrelevantes)</legend>
+          <div class="row">
+            <label for="lvl">Nivel de inutilidad: <b id="lvlv">50</b>%</label>
+            <input type="range" id="lvl" min="0" max="100" value="50">
+          </div>
+          <div class="row">
+            <label><input type="checkbox" id="turbo"> Modo turbo (igual de inútil, pero más rápido)</label>
+          </div>
+          <div class="row">
+            <label><input type="checkbox" checked disabled> Recordar que no hice nada</label>
+            <button class="btn" id="apply">Aplicar</button>
+          </div>
+        </fieldset>
+      </div>
+      <div class="status">
+        <span id="count">Nada hecho: 0 veces</span>
+        <span id="bstat">Burbujas reventadas: 0</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Diálogo -->
+  <div class="overlay" id="ov">
+    <div class="window dialog">
+      <div class="titlebar"><div class="ico"></div><div class="t" id="dTitle">Nada.exe</div>
+        <div class="caps"><div class="cap close" style="border-bottom-left-radius:5px" data-close>✕</div></div>
+      </div>
+      <div class="content">
+        <div class="body"><div class="icon" id="dIcon">i</div><div id="dMsg"></div></div>
+        <div class="foot" id="dFoot"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Barra de tareas -->
+  <div class="taskbar">
+    <div class="orb" id="orb" title="Inicio (no inicia nada)"></div>
+    <div class="task" id="task"><div class="ico"></div>Nada.exe</div>
+    <div class="clock" id="clock"></div>
+  </div>
+
+<script>
+  const $ = id => document.getElementById(id);
+  const win = $('win');
+
+  // Centrar ventana
+  function center() {
+    win.style.left = Math.max(16, (innerWidth - win.offsetWidth) / 2) + 'px';
+    win.style.top  = Math.max(16, (innerHeight - 40 - win.offsetHeight) / 2) + 'px';
+  }
+  center();
+
+  // Arrastrar
+  let drag = null;
+  $('drag').addEventListener('pointerdown', e => {
+    if (e.target.closest('.cap') || win.classList.contains('max')) return;
+    drag = { x: e.clientX - win.offsetLeft, y: e.clientY - win.offsetTop };
+    $('drag').setPointerCapture(e.pointerId);
+  });
+  $('drag').addEventListener('pointermove', e => {
+    if (!drag) return;
+    win.style.left = (e.clientX - drag.x) + 'px';
+    win.style.top  = Math.max(0, e.clientY - drag.y) + 'px';
+  });
+  $('drag').addEventListener('pointerup', () => drag = null);
+  $('drag').addEventListener('dblclick', () => $('bMax').click());
+
+  // Diálogo genérico
+  function dialog(msg, { title = 'Nada.exe', icon = 'i', buttons = [['Aceptar']] } = {}) {
+    $('dTitle').textContent = title;
+    $('dIcon').textContent = icon;
+    $('dMsg').innerHTML = msg;
+    const foot = $('dFoot'); foot.innerHTML = '';
+    buttons.forEach(([label, fn]) => {
+      const b = document.createElement('button');
+      b.className = 'btn'; b.textContent = label;
+      b.onclick = () => { $('ov').classList.remove('show'); fn && fn(); };
+      foot.appendChild(b);
+    });
+    $('ov').classList.add('show');
+    foot.firstChild.focus();
+  }
+  document.querySelector('[data-close]').onclick = () => $('ov').classList.remove('show');
+
+  // Botones de ventana
+  $('bMin').onclick = () => win.classList.add('hidden');
+  $('task').onclick = () => win.classList.toggle('hidden');
+  $('bMax').onclick = () => { win.classList.toggle('max'); if (!win.classList.contains('max')) center(); };
+  $('bClose').onclick = () => dialog('¿Seguro que quieres cerrar <b>Nada.exe</b>?<br>Cerrarlo tampoco hará nada.', {
+    icon: '?', buttons: [
+      ['Sí', () => {
+        win.classList.add('hidden');
+        setTimeout(() => {
+          win.classList.remove('hidden', 'max'); center();
+          win.classList.add('shake'); setTimeout(() => win.classList.remove('shake'), 400);
+          dialog('Nada.exe se ha recuperado de un cierre inesperado.<br>No se perdió nada, porque no había nada.', { icon: '!' });
+        }, 1500);
+      }],
+      ['No'], ['Tal vez']
+    ]
+  });
+
+  // Hacer nada
+  const steps = [
+    'Calculando el vacío…', 'Desfragmentando la nada…', 'Sincronizando con la nube (de vapor)…',
+    'Contando ceros…', 'Puliendo el cristal…', 'Optimizando píxeles invisibles…', 'Verificando que nada cambió…'
+  ];
+  const results = [
+    'Se hizo nada con éxito.',
+    'Nada procesado: 0 bytes en 0 archivos.',
+    'Se encontraron 0 problemas. Se resolvieron 0.',
+    'Tu nada se ha guardado en ninguna parte.',
+    'Operación completada. Tu equipo sigue exactamente igual.',
+    'Se liberaron 0 MB de espacio. ¡Increíble!',
+    'Nada.exe ha sido actualizado a la misma versión.'
+  ];
+  let count = 0;
+  $('go').onclick = () => {
+    const btn = $('go'); btn.disabled = true;
+    const speed = $('turbo').checked ? 25 : 70;
+    let p = 0;
+    const t = setInterval(() => {
+      p += Math.random() * 4 + 1;
+      if (p > 88 && p < 99 && Math.random() < .7) p -= 3;   // el clásico atasco al 9x%
+      p = Math.min(p, 100);
+      $('fill').style.width = p + '%';
+      $('ptxt').textContent = steps[Math.floor(p / 100 * steps.length) % steps.length] + ' ' + Math.floor(p) + '%';
+      if (p >= 100) {
+        clearInterval(t);
+        count++;
+        $('count').textContent = `Nada hecho: ${count} ${count === 1 ? 'vez' : 'veces'}`;
+        $('ptxt').textContent = 'Completado. No pasó nada.';
+        btn.disabled = false;
+        dialog(results[Math.floor(Math.random() * results.length)], { title: 'Operación completada' });
+        setTimeout(() => $('fill').style.width = '0', 600);
+      }
+    }, speed);
+  };
+
+  // Opciones
+  $('lvl').oninput = e => $('lvlv').textContent = e.target.value;
+  $('apply').onclick = () => dialog(`Se ha aplicado un nivel de inutilidad del ${$('lvl').value}%.<br>Los cambios no tendrán ningún efecto.`);
+  const menus = {
+    'Archivo': 'No hay archivos. Nunca los hubo.',
+    'Editar': 'No hay nada que editar.',
+    'Ver': 'Estás viendo nada. En alta definición.',
+    'Herramientas': 'Herramientas disponibles: ninguna.',
+    'Ayuda': '<b>Nada.exe</b> versión 7.0<br>© Nadie. Ningún derecho reservado.'
+  };
+  $('menu').onclick = e => { if (e.target.tagName === 'SPAN') dialog(menus[e.target.textContent], { title: e.target.textContent }); };
+  $('orb').onclick = () => dialog('El menú Inicio no inicia nada.<br>Prueba a reventar burbujas.', { title: 'Inicio' });
+
+  // Reloj
+  function tick() {
+    const d = new Date();
+    $('clock').innerHTML = d.toLocaleTimeString('es', { hour: '2-digit', minute: '2-digit' }) + '<br>' + d.toLocaleDateString('es');
+  }
+  tick(); setInterval(tick, 10000);
+
+  // Burbujas
+  let popped = 0;
+  function bubble() {
+    const b = document.createElement('div');
+    const s = 20 + Math.random() * 90;
+    b.className = 'bubble';
+    b.style.width = b.style.height = s + 'px';
+    b.style.left = Math.random() * 100 + 'vw';
+    b.style.animationDuration = (10 + Math.random() * 14) + 's';
+    b.onpointerdown = () => {
+      b.classList.add('pop');
+      popped++; $('bstat').textContent = 'Burbujas reventadas: ' + popped;
+      setTimeout(() => b.remove(), 250);
+    };
+    b.addEventListener('animationend', () => b.remove());
+    $('bubbles').appendChild(b);
+  }
+  for (let i = 0; i < 6; i++) setTimeout(bubble, i * 700);
+  setInterval(bubble, 1400);
+  addEventListener('resize', () => { if (!win.classList.contains('max')) center(); });
+</script>
+</body>
+</html>

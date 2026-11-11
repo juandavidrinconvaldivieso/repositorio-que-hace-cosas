@@ -1,0 +1,322 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Nada.exe</title>
+<style>
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; overflow: hidden; }
+  body {
+    font-family: "Segoe UI", Tahoma, sans-serif;
+    font-size: 13px;
+    color: #1e1e1e;
+    background: linear-gradient(#0f6fc6 0%, #3fa6ef 35%, #9fdcff 65%, #e9f9ff 100%);
+    user-select: none;
+    cursor: default;
+  }
+
+  /* ---------- Escena Frutiger Aero (se ve a través del cristal) ---------- */
+  .sun {
+    position: fixed; top: -160px; right: -120px; width: 460px; height: 460px; border-radius: 50%;
+    background: radial-gradient(circle, rgba(255,255,230,.95) 0%, rgba(255,255,200,.4) 30%, transparent 65%);
+  }
+  .ray {
+    position: fixed; inset: 0;
+    background: repeating-conic-gradient(from 200deg at 90% 0%, rgba(255,255,255,.12) 0 6deg, transparent 6deg 14deg);
+  }
+  .hill { position: fixed; border-radius: 50%; box-shadow: inset 0 18px 30px rgba(255,255,255,.45); }
+  .hill.back  { left: -30%; bottom: -45%; width: 100%; height: 75%; background: radial-gradient(ellipse at 50% 20%, #a6eb6a, #4cb52f 60%, #2d8a1c); }
+  .hill.front { right: -35%; bottom: -50%; width: 120%; height: 80%; background: radial-gradient(ellipse at 40% 15%, #c4f78a, #6ccc36 55%, #2f9a1f); }
+  #bubbles { position: fixed; inset: 0; z-index: 1; pointer-events: none; }
+  .bubble {
+    position: absolute; bottom: -120px; border-radius: 50%;
+    background:
+      radial-gradient(circle at 30% 28%, rgba(255,255,255,.95) 0 8%, rgba(255,255,255,0) 22%),
+      radial-gradient(circle at 50% 50%, rgba(255,255,255,0) 55%, rgba(170,230,255,.35) 75%, rgba(255,255,255,.75) 100%);
+    border: 1px solid rgba(255,255,255,.35);
+    animation: rise linear forwards;
+  }
+  @keyframes rise {
+    0%   { transform: translate(0, 0); }
+    50%  { transform: translate(30px, -55vh); }
+    100% { transform: translate(-20px, -120vh); }
+  }
+  .bubble.pop { animation: pop .25s ease-out forwards; }
+  @keyframes pop { from { transform: var(--t) scale(1); } to { transform: var(--t) scale(1.6); opacity: 0; } }
+
+  /* ---------- Marco de ventana Aero ---------- */
+  .window {
+    position: fixed; inset: 0; z-index: 2; padding: 0 7px 7px;
+    display: flex; flex-direction: column;
+    background: linear-gradient(rgba(190,220,250,.55), rgba(110,165,215,.5));
+    backdrop-filter: blur(8px);
+    border: 1px solid rgba(0,0,0,.6);
+    box-shadow: inset 0 0 0 1px rgba(255,255,255,.65);
+  }
+  .window::before { /* reflejos diagonales del cristal */
+    content: ""; position: absolute; inset: 0; pointer-events: none;
+    background: linear-gradient(115deg, transparent 15%, rgba(255,255,255,.25) 22%, transparent 30%, transparent 62%, rgba(255,255,255,.15) 68%, transparent 74%);
+  }
+  .titlebar { height: 30px; flex: none; display: flex; align-items: center; gap: 6px; position: relative; padding-left: 2px; }
+  .titlebar .ico, .dialog .ico { width: 16px; height: 16px; border-radius: 50%; background: radial-gradient(circle at 35% 30%, #fff, #7fd3ff 40%, #1677c9); box-shadow: 0 0 0 1px rgba(0,0,0,.3); }
+  .titlebar .t { flex: 1; text-shadow: 0 0 10px #fff, 0 0 10px #fff, 0 0 6px #fff; }
+  .caps { display: flex; align-self: flex-start; margin-top: -1px; position: relative; z-index: 5; }
+  .cap {
+    width: 28px; height: 19px; border: 1px solid rgba(0,0,0,.55); border-top: 0;
+    background: linear-gradient(rgba(255,255,255,.55), rgba(255,255,255,.2) 50%, rgba(255,255,255,.05) 51%, rgba(255,255,255,.3));
+    box-shadow: inset 0 0 0 1px rgba(255,255,255,.5);
+    display: grid; place-items: center; color: #fff; font: bold 11px Tahoma; text-shadow: 0 0 2px #000, 0 0 2px #000;
+  }
+  .cap + .cap { border-left: 0; }
+  .cap:first-child { border-bottom-left-radius: 5px; }
+  .cap.close { width: 46px; border-bottom-right-radius: 5px; background: linear-gradient(#e8a493, #d0705a 50%, #c74727 51%, #d9783b); }
+  .cap:hover { background: linear-gradient(#bfe6ff, #6fc0f2 50%, #2d8fd9 51%, #63d0ff); }
+  .cap.close:hover { background: linear-gradient(#ffb6a5, #ef6a4d 50%, #e13b13 51%, #ff9c45); box-shadow: 0 0 12px #ff6a2a, inset 0 0 0 1px rgba(255,255,255,.5); }
+
+  .content { flex: 1; display: flex; flex-direction: column; border: 1px solid rgba(0,0,0,.45); box-shadow: 0 0 0 1px rgba(255,255,255,.6); min-height: 0; }
+  .menu { display: flex; background: linear-gradient(#fdfeff, #e6eef9); border-bottom: 1px solid #b6c5da; padding: 1px 2px; }
+  .menu span { padding: 3px 8px; border: 1px solid transparent; border-radius: 3px; }
+  .menu span:hover { background: linear-gradient(#f2f8fe, #d9ecfc); border-color: #a8d2f5; }
+
+  /* Hueco transparente: deja ver el paisaje y las burbujas */
+  .hero { height: 120px; flex: none; padding: 18px 22px; position: relative; border-bottom: 1px solid rgba(0,0,0,.25);
+    background: linear-gradient(rgba(255,255,255,.15), rgba(255,255,255,0)); }
+  .hero h1 { margin: 0; font-weight: 300; font-size: 30px; color: #fff; text-shadow: 0 1px 2px rgba(0,40,90,.6), 0 0 18px rgba(255,255,255,.6); }
+  .hero p { margin: 4px 0 0; color: #fff; text-shadow: 0 1px 2px rgba(0,40,90,.7); }
+
+  .body { padding: 18px 22px; flex: 1; background: linear-gradient(#fff 70%, #f1f6fc); }
+
+  .bigbtn {
+    display: block; margin: 0 auto 18px; padding: 12px 38px; font: 600 16px "Segoe UI", sans-serif; color: #fff;
+    border: 1px solid #1d6aa5; border-radius: 26px; cursor: pointer;
+    text-shadow: 0 -1px 0 rgba(0,0,0,.35);
+    background: linear-gradient(#a9e4ff 0%, #5cbcf2 48%, #2493dc 50%, #3fb5f5 100%);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.85), inset 0 -4px 10px rgba(160,240,255,.6), 0 3px 8px rgba(0,80,160,.35);
+    transition: filter .15s, transform .1s;
+  }
+  .bigbtn:hover { filter: brightness(1.1) saturate(1.15); }
+  .bigbtn:active { transform: translateY(1px); filter: brightness(.95); }
+  .bigbtn:disabled { filter: grayscale(.7) opacity(.7); cursor: wait; }
+
+  .progress { height: 16px; border: 1px solid #b2b2b2; border-radius: 3px; background: linear-gradient(#f3f3f3, #dcdcdc); overflow: hidden; }
+  .fill { height: 100%; width: 0; position: relative; overflow: hidden;
+    background: linear-gradient(#a9f59b 0%, #3fd23a 45%, #06b025 50%, #22c42a 100%); transition: width .2s; }
+  .fill::after { content: ""; position: absolute; top: 0; bottom: 0; width: 80px; left: -80px;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,.75), transparent); animation: shine 1.6s linear infinite; }
+  @keyframes shine { to { left: 110%; } }
+  .ptxt { margin: 6px 0 16px; color: #333; min-height: 18px; }
+
+  fieldset { border: 1px solid #d5dfe5; border-radius: 4px; margin: 0; padding: 8px 12px 12px; }
+  legend { color: #1e3287; padding: 0 4px; }
+  .row { display: flex; align-items: center; gap: 10px; margin-top: 8px; }
+  .row label { flex: 1; }
+  input[type=range] { flex: 1; }
+
+  .btn {
+    padding: 4px 16px; min-width: 76px; font: 13px "Segoe UI", sans-serif; cursor: pointer;
+    border: 1px solid #707070; border-radius: 3px;
+    background: linear-gradient(#f2f2f2 0%, #ebebeb 45%, #dddddd 50%, #cfcfcf 100%);
+    box-shadow: inset 0 0 0 1px rgba(255,255,255,.7);
+  }
+  .btn:hover { border-color: #3c7fb1; background: linear-gradient(#eaf6fd 0%, #d9f0fc 45%, #bee6fd 50%, #a7d9f5 100%); }
+  .btn:active { background: linear-gradient(#e5f4fc, #c4e5f6 50%, #98d1ef 51%, #68b3db); }
+
+  .status { display: flex; justify-content: space-between; padding: 3px 8px; border-top: 1px solid #c9d6e6; background: linear-gradient(#f4f8fd, #dfe9f5); color: #333; font-size: 12px; }
+
+  /* ---------- Diálogo ---------- */
+  .overlay { position: fixed; inset: 0; z-index: 50; display: none; place-items: center; background: rgba(0,0,0,.08); }
+  .overlay.show { display: grid; }
+  .dialog {
+    width: 380px; padding: 0 7px 7px; border-radius: 8px;
+    background: linear-gradient(rgba(190,220,250,.8), rgba(110,165,215,.75));
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(0,0,0,.55);
+    box-shadow: inset 0 0 0 1px rgba(255,255,255,.65), 0 10px 30px rgba(0,0,0,.45);
+  }
+  .dialog .titlebar .caps .cap.close { border-bottom-left-radius: 5px; }
+  .dialog .inner { background: #fff; border: 1px solid rgba(0,0,0,.45); }
+  .dialog .msg { display: flex; gap: 14px; padding: 18px; }
+  .dialog .icon { flex: none; width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center;
+    font: bold 20px Georgia, serif; color: #fff; background: radial-gradient(circle at 35% 30%, #9fd8ff, #2a7fd4 60%, #134f9b); box-shadow: 0 1px 3px rgba(0,0,0,.4); }
+  .dialog .foot { background: #f0f0f0; border-top: 1px solid #dfdfdf; padding: 10px 12px; display: flex; justify-content: flex-end; gap: 8px; }
+</style>
+</head>
+<body>
+  <div class="ray"></div>
+  <div class="sun"></div>
+  <div class="hill back"></div>
+  <div class="hill front"></div>
+  <div id="bubbles"></div>
+
+  <div class="window">
+    <div class="titlebar pywebview-drag-region" id="title">
+      <div class="ico"></div>
+      <div class="t">Nada.exe — Centro de Inutilidad</div>
+      <div class="caps">
+        <div class="cap" id="bMin" title="Minimizar">_</div>
+        <div class="cap" id="bMax" title="Maximizar">□</div>
+        <div class="cap close" id="bClose" title="Cerrar">✕</div>
+      </div>
+    </div>
+    <div class="content">
+      <div class="menu" id="menu">
+        <span>Archivo</span><span>Editar</span><span>Ver</span><span>Herramientas</span><span>Ayuda</span>
+      </div>
+      <div class="hero">
+        <h1>Bienvenido a Nada.exe</h1>
+        <p>La aplicación líder en no hacer absolutamente nada, ahora con efecto cristal.</p>
+      </div>
+      <div class="body">
+        <button class="bigbtn" id="go">Hacer nada</button>
+
+        <div class="progress"><div class="fill" id="fill"></div></div>
+        <div class="ptxt" id="ptxt">Listo para no hacer nada.</div>
+
+        <fieldset>
+          <legend>Opciones avanzadas (irrelevantes)</legend>
+          <div class="row">
+            <label for="lvl">Nivel de inutilidad: <b id="lvlv">50</b>%</label>
+            <input type="range" id="lvl" min="0" max="100" value="50">
+          </div>
+          <div class="row">
+            <label><input type="checkbox" id="turbo"> Modo turbo (igual de inútil, pero más rápido)</label>
+          </div>
+          <div class="row">
+            <label><input type="checkbox" checked disabled> Recordar que no hice nada</label>
+            <button class="btn" id="apply">Aplicar</button>
+          </div>
+        </fieldset>
+      </div>
+      <div class="status">
+        <span id="count">Nada hecho: 0 veces</span>
+        <span id="bstat">Burbujas reventadas: 0</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="overlay" id="ov">
+    <div class="dialog">
+      <div class="titlebar"><div class="ico"></div><div class="t" id="dTitle">Nada.exe</div>
+        <div class="caps"><div class="cap close" id="dX">✕</div></div>
+      </div>
+      <div class="inner">
+        <div class="msg"><div class="icon" id="dIcon">i</div><div id="dMsg"></div></div>
+        <div class="foot" id="dFoot"></div>
+      </div>
+    </div>
+  </div>
+
+<script>
+  const $ = id => document.getElementById(id);
+  const api = () => (window.pywebview && window.pywebview.api) || null;
+
+  // Diálogo genérico
+  function dialog(msg, { title = 'Nada.exe', icon = 'i', buttons = [['Aceptar']] } = {}) {
+    $('dTitle').textContent = title;
+    $('dIcon').textContent = icon;
+    $('dMsg').innerHTML = msg;
+    const foot = $('dFoot'); foot.innerHTML = '';
+    buttons.forEach(([label, fn]) => {
+      const b = document.createElement('button');
+      b.className = 'btn'; b.textContent = label;
+      b.onclick = () => { $('ov').classList.remove('show'); fn && fn(); };
+      foot.appendChild(b);
+    });
+    $('ov').classList.add('show');
+    foot.firstChild.focus();
+  }
+  $('dX').onclick = () => $('ov').classList.remove('show');
+
+  // Botones de la ventana (llaman a Python)
+  $('bMin').onclick = () => api() && api().minimize();
+  $('bMax').onclick = () => api() && api().toggle_maximize();
+  $('title').addEventListener('dblclick', e => { if (!e.target.closest('.cap')) $('bMax').click(); });
+
+  let survivedCrash = false;
+  $('bClose').onclick = () => dialog('¿Seguro que quieres cerrar <b>Nada.exe</b>?<br>Cerrarlo tampoco hará nada.', {
+    icon: '?', buttons: [
+      ['Sí', () => {
+        if (survivedCrash) return api() && api().close();
+        survivedCrash = true;
+        api() && api().fake_crash();
+      }],
+      ['No'], ['Tal vez']
+    ]
+  });
+  // Python llama a esto cuando la ventana "resucita"
+  window.recovered = () => dialog('Nada.exe se ha recuperado de un cierre inesperado.<br>No se perdió nada, porque no había nada.<br><br><small>(Si vuelves a cerrarla, esta vez sí se cierra.)</small>', { icon: '!' });
+
+  // Hacer nada
+  const steps = [
+    'Calculando el vacío…', 'Desfragmentando la nada…', 'Sincronizando con la nube (de vapor)…',
+    'Contando ceros…', 'Puliendo el cristal…', 'Optimizando píxeles invisibles…', 'Verificando que nada cambió…'
+  ];
+  const results = [
+    'Se hizo nada con éxito.',
+    'Nada procesado: 0 bytes en 0 archivos.',
+    'Se encontraron 0 problemas. Se resolvieron 0.',
+    'Tu nada se ha guardado en ninguna parte.',
+    'Operación completada. Tu equipo sigue exactamente igual.',
+    'Se liberaron 0 MB de espacio. ¡Increíble!',
+    'Nada.exe ha sido actualizado a la misma versión.'
+  ];
+  let count = 0;
+  $('go').onclick = () => {
+    const btn = $('go'); btn.disabled = true;
+    const speed = $('turbo').checked ? 25 : 70;
+    let p = 0;
+    const t = setInterval(() => {
+      p += Math.random() * 4 + 1;
+      if (p > 88 && p < 99 && Math.random() < .7) p -= 3;   // el clásico atasco al 9x %
+      p = Math.min(p, 100);
+      $('fill').style.width = p + '%';
+      $('ptxt').textContent = steps[Math.floor(p / 100 * steps.length) % steps.length] + ' ' + Math.floor(p) + '%';
+      if (p >= 100) {
+        clearInterval(t);
+        count++;
+        $('count').textContent = `Nada hecho: ${count} ${count === 1 ? 'vez' : 'veces'}`;
+        $('ptxt').textContent = 'Completado. No pasó nada.';
+        btn.disabled = false;
+        dialog(results[Math.floor(Math.random() * results.length)], { title: 'Operación completada' });
+        setTimeout(() => $('fill').style.width = '0', 600);
+      }
+    }, speed);
+  };
+
+  // Opciones y menús
+  $('lvl').oninput = e => $('lvlv').textContent = e.target.value;
+  $('apply').onclick = () => dialog(`Se ha aplicado un nivel de inutilidad del ${$('lvl').value}%.<br>Los cambios no tendrán ningún efecto.`);
+  const menus = {
+    'Archivo': 'No hay archivos. Nunca los hubo.',
+    'Editar': 'No hay nada que editar.',
+    'Ver': 'Estás viendo nada. En alta definición.',
+    'Herramientas': 'Herramientas disponibles: ninguna.',
+    'Ayuda': '<b>Nada.exe</b> versión 7.0<br>© Nadie. Ningún derecho reservado.'
+  };
+  $('menu').onclick = e => { if (e.target.tagName === 'SPAN') dialog(menus[e.target.textContent], { title: e.target.textContent }); };
+
+  // Burbujas (solo se ven por el cristal y el hueco del encabezado)
+  let popped = 0;
+  function bubble() {
+    const b = document.createElement('div');
+    const s = 16 + Math.random() * 60;
+    b.className = 'bubble';
+    b.style.width = b.style.height = s + 'px';
+    b.style.left = Math.random() * 100 + 'vw';
+    b.style.animationDuration = (8 + Math.random() * 10) + 's';
+    b.addEventListener('animationend', () => b.remove());
+    $('bubbles').appendChild(b);
+  }
+  // Están detrás del cristal: se revientan haciendo clic en el encabezado transparente
+  document.querySelector('.hero').addEventListener('pointerdown', e => {
+    const b = document.elementsFromPoint(e.clientX, e.clientY).find(el => el.classList.contains('bubble') && !el.classList.contains('pop'));
+    if (!b) return;
+    b.style.setProperty('--t', getComputedStyle(b).transform.replace('none', ''));
+    b.classList.add('pop');
+    popped++; $('bstat').textContent = 'Burbujas reventadas: ' + popped;
+  });
+  for (let i = 0; i < 5; i++) setTimeout(bubble, i * 600);
+  setInterval(bubble, 1200);
+</script>
+</body>
+</html>

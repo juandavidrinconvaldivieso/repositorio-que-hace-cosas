@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Subtítulos PiP</title>
+<link rel="stylesheet" href="popup.css">
+</head>
+<body>
+<header>
+  <strong>⧉ Subtítulos PiP</strong>
+  <span class="cf">
+    <label class="sw" title="Activar / desactivar"><input type="checkbox" data-key="enabled"><span></span></label>
+    <button id="closePanel" class="link only-panel" title="Cerrar menú">✕</button>
+  </span>
+</header>
+<p id="status" class="muted">Buscando vídeo…</p>
+<button id="open" class="primary">Abrir PiP con subtítulos</button>
+<div id="live" class="btns live" hidden>
+  <button data-live="cc">CC</button><button data-live="smaller">A−</button>
+  <button data-live="bigger">A+</button><button data-live="mode">Modo</button>
+</div>
+
+<label class="row">Ventana PiP
+  <select data-key="pipMethod">
+    <option value="real">Vídeo real (fluido, con línea de tiempo)</option>
+    <option value="canvas">Con subtítulos dentro (menos fluido)</option>
+  </select></label>
+
+<h2>Modo de subtítulos</h2>
+<label class="card"><input type="radio" name="mode" value="scale" data-key="mode">
+  <b>Escala con el vídeo</b><small>Crecen y se encogen con la ventana PiP, igual que en el reproductor.</small></label>
+<label class="card"><input type="radio" name="mode" value="fixed" data-key="mode">
+  <b>Tamaño fijo</b><small>Conservan su tamaño; si la ventana es pequeña caben menos palabras por línea.</small></label>
+<label class="card"><input type="radio" name="mode" value="outside" data-key="mode">
+  <b>Fuera del vídeo</b><small>En una franja debajo o encima del vídeo, sin taparlo ni limitarse a él.</small></label>
+
+<h2>Tamaño</h2>
+<label class="row">Tamaño relativo <output data-for="scale" data-fmt="pct"></output>
+  <input type="range" min="0.3" max="3" step="0.05" data-key="scale"></label>
+<label class="row">Tamaño mínimo <output data-for="minFontPx" data-fmt="px"></output>
+  <input type="range" min="6" max="24" step="1" data-key="minFontPx"></label>
+<label class="row only-fixed">Ancho máximo del texto <output data-for="fixedMaxWidth" data-fmt="%"></output>
+  <input type="range" min="30" max="100" step="5" data-key="fixedMaxWidth"></label>
+<label class="chk only-reflow"><input type="checkbox" data-key="joinLines"> Unir líneas para reacomodar el texto</label>
+<div class="only-outside">
+  <label class="row">Posición de la franja
+    <select data-key="outsidePosition">
+      <option value="auto">Automática (respeta la original)</option>
+      <option value="bottom">Siempre debajo</option>
+      <option value="top">Siempre encima</option>
+    </select></label>
+  <label class="row">Líneas reservadas <output data-for="outsideLines"></output>
+    <input type="range" min="1" max="5" step="1" data-key="outsideLines"></label>
+  <label class="row">Letra fija <output data-for="outsideFontPx" data-fmt="px0"></output>
+    <input type="range" min="0" max="60" step="1" data-key="outsideFontPx"></label>
+</div>
+
+<h2>Subtítulos en el escritorio</h2>
+<label class="chk"><input type="checkbox" data-key="desktop"> Mostrar los subtítulos en una capa transparente sobre todo el escritorio</label>
+<p id="deskStatus" class="muted small">Requiere el programa «escritorio\iniciar.bat».</p>
+<div class="only-desk">
+  <label class="row">Colocación
+    <select data-key="desktopLayout">
+      <option value="original">Como en el vídeo (misma posición)</option>
+      <option value="compact">Fijos abajo y centrados</option>
+    </select></label>
+  <label class="row">Estilo (propio)
+    <select data-key="deskStyle">
+      <option value="original">Original del sitio</option><option value="youtube">Clásico (fondo oscuro)</option>
+      <option value="outline">Contorno de cine</option><option value="shadow">Sombra</option>
+      <option value="yellow">Amarillo DVD</option><option value="contrast">Alto contraste</option>
+    </select></label>
+  <label class="row">Tamaño (propio) <output data-for="deskScale" data-fmt="pct"></output>
+    <input type="range" min="0.3" max="3" step="0.05" data-key="deskScale"></label>
+  <label class="chk"><input type="checkbox" data-key="deskHideOriginal"> Ocultar los subtítulos normales del vídeo</label>
+  <div class="btns"><button data-desk="edit">Mover / ajustar</button><button data-desk="lock">Fijar</button></div>
+  <div class="btns" style="margin-top:6px"><button data-desk="full">Pantalla completa</button><button data-desk="box">Rectángulo</button></div>
+  <p class="muted small">Fijado, los clics pasan a lo que hay detrás: puedes seguir usando y seleccionando todo.
+    Tamaño: usa «Tamaño relativo» (y el modo Tamaño fijo para que no dependa del rectángulo).</p>
+</div>
+
+<h2>Estilo de subtítulos</h2>
+<div id="preview"><div id="pv-sub" class="sp-sub"></div></div>
+<label class="row">Tipo de ejemplo
+  <select id="pvType">
+    <option value="normal">Normales (aparecen enteros)</option>
+    <option value="rollup">Automáticos (palabra por palabra)</option>
+    <option value="styled">Con color, cursiva y posición</option>
+    <option value="dialog">Diálogo con guiones</option>
+  </select></label>
+<label class="row">Estilo
+  <select data-key="stylePreset">
+    <option value="original">Original del sitio (sin cambios)</option>
+    <option value="youtube">Clásico (fondo oscuro)</option>
+    <option value="outline">Contorno de cine</option>
+    <option value="shadow">Sombra</option>
+    <option value="yellow">Amarillo DVD</option>
+    <option value="contrast">Alto contraste</option>
+    <option value="custom">Personalizado…</option>
+  </select></label>
+<div class="only-custom">
+  <div class="row">Color del texto <span class="cf"><input type="checkbox" data-use="textColor"><input type="color" data-color="textColor" value="#ffffff"></span></div>
+  <label class="row">Opacidad del texto <output data-for="textOpacity" data-fmt="%"></output>
+    <input type="range" min="10" max="100" step="5" data-key="textOpacity"></label>
+  <div class="row">Fondo del texto <span class="cf"><input type="checkbox" data-use="bgColor"><input type="color" data-color="bgColor" value="#000000"></span></div>
+  <label class="row">Opacidad del fondo <output data-for="bgOpacity" data-fmt="%"></output>
+    <input type="range" min="0" max="100" step="5" data-key="bgOpacity"></label>
+  <div class="row">Fondo de la caja <span class="cf"><input type="checkbox" data-use="windowColor"><input type="color" data-color="windowColor" value="#000000"></span></div>
+  <label class="row">Opacidad de la caja <output data-for="windowOpacity" data-fmt="%"></output>
+    <input type="range" min="0" max="100" step="5" data-key="windowOpacity"></label>
+  <label class="row">Borde
+    <select data-key="edge">
+      <option value="original">Original</option><option value="none">Ninguno</option>
+      <option value="outline">Contorno</option><option value="shadow">Sombra</option>
+      <option value="raised">Relieve</option><option value="depressed">Hundido</option>
+    </select></label>
+  <label class="row">Fuente
+    <select data-key="fontFamily">
+      <option value="original">Original</option><option value="sans">Sans (Arial)</option>
+      <option value="serif">Serif (Georgia)</option><option value="mono">Monoespaciada</option>
+      <option value="casual">Informal</option><option value="cursive">Cursiva</option>
+      <option value="smallcaps">Versalitas</option>
+    </select></label>
+  <label class="row">Grosor
+    <select data-key="fontWeight">
+      <option value="original">Original</option><option value="normal">Normal</option><option value="bold">Negrita</option>
+    </select></label>
+  <p class="muted small">Casilla desmarcada = se usa el color original del sitio.</p>
+</div>
+<p class="muted small">«Original» copia exactamente lo que muestra el sitio, incluido el estilo que configuraste
+  en YouTube (⚙ → Subtítulos → Opciones), los colores, cursivas y posiciones de cada subtítulo.</p>
+
+<h2>Comportamiento</h2>
+<label class="chk"><input type="checkbox" data-key="showButton"> Botón ⧉ CC sobre los vídeos</label>
+<label class="chk"><input type="checkbox" data-key="interceptSitePip"> Usar este PiP en el botón PiP del sitio</label>
+<label class="chk"><input type="checkbox" data-key="autoPip"> PiP automático al cambiar de pestaña</label>
+<label class="row">Atajo de teclado <input id="hotkey" type="text" data-key="hotkey" readonly title="Haz clic y pulsa la combinación"></label>
+
+<h2>Subtítulos de este sitio</h2>
+<p id="pick" class="muted">Detección automática.</p>
+<div class="btns"><button id="pickBtn">Elegir manualmente</button><button id="forget">Olvidar</button></div>
+
+<footer><button id="reset" class="link">Restablecer valores</button></footer>
+<script src="../src/defaults.js"></script>
+<script src="popup.js"></script>
+</body>
+</html>

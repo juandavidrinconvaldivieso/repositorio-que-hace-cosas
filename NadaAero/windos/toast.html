@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Wind OS Messenger</title>
+<link rel="stylesheet" href="aero.css">
+<link rel="stylesheet" href="skins.css">
+<style>
+  html, body { background: #cfe6fb; }
+  .window { animation: fadein .4s ease-out; }
+  @keyframes fadein { from { opacity: 0; transform: translateY(20px); } }
+  .tbody { flex: 1; display: flex; align-items: center; gap: 10px; padding: 8px 10px; cursor: pointer; background: linear-gradient(#fff, #dfeaf7); min-width: 0; }
+  .tbody:hover { background: linear-gradient(#fff, #cfe3f8); }
+  .tbody .txt { min-width: 0; }
+  .tbody .line { overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; color: #333; }
+  .tbody small { color: #3d7bad; text-decoration: underline; }
+</style>
+</head>
+<body>
+  <div class="window">
+    <div class="titlebar pywebview-drag-region" id="title">
+      <div class="ico"></div><div class="t">Wind OS Messenger</div>
+      <div class="caps"><div class="cap close" id="bClose" style="border-bottom-left-radius:5px">✕</div></div>
+    </div>
+    <div class="content">
+      <div class="tbody" id="tb"></div>
+    </div>
+  </div>
+<script src="i18n.js"></script>
+<script src="retro.js"></script>
+<script src="common.js"></script>
+<script>
+  onReady(async () => {
+    const d = await api().get_data();
+    applyTheme(d.theme);
+    setLang(d.lang);
+    window.SOUNDS_ON = d.sounds !== false;
+    $('tb').innerHTML = `${avatarHtml(d.profile, 52, d.status)}<div class="txt"><b>${esc(d.title)}</b><div class="line">${fmt(d.text || '')}</div><small>${d.code ? 'Haz clic para abrir' : ''}</small></div>`;
+    trNode($('tb'));  // traducir ya (la ventana está oculta y ahí no corre requestAnimationFrame)
+    $('tb').onclick = () => api().open();
+    $('bClose').onclick = () => api().close();
+    // Mostrar solo cuando ya está todo pintado: así no aparece el rectángulo negro
+    // (en una ventana oculta no corre requestAnimationFrame, por eso un temporizador corto)
+    setTimeout(() => api().shown(), 80);
+    setTimeout(() => api().close(), 7000);
+  });
+</script>
+</body>
+</html>

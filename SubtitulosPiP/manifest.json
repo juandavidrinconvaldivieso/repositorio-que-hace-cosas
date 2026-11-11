@@ -1,0 +1,31 @@
+{
+  "manifest_version": 3,
+  "name": "Subtítulos PiP",
+  "version": "1.0.0",
+  "description": "Imagen en imagen con subtítulos visibles y personalizables (escala, tamaño fijo o fuera del vídeo).",
+  "permissions": ["storage"],
+  "host_permissions": ["http://127.0.0.1:47321/*"],
+  "background": { "service_worker": "background.js" },
+  "action": { "default_popup": "popup/popup.html", "default_title": "Subtítulos PiP" },
+  "web_accessible_resources": [
+    {
+      "resources": ["popup/popup.html", "popup/popup.css", "popup/popup.js", "src/defaults.js"],
+      "matches": ["<all_urls>"]
+    }
+  ],
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["src/page-hook.js"],
+      "world": "MAIN",
+      "run_at": "document_start",
+      "all_frames": true
+    },
+    {
+      "matches": ["<all_urls>"],
+      "js": ["src/defaults.js", "src/content.js"],
+      "run_at": "document_end",
+      "all_frames": true
+    }
+  ]
+}

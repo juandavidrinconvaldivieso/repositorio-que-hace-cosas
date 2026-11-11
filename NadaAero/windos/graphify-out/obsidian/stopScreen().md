@@ -1,0 +1,20 @@
+---
+source_file: "NadaAero\windos\calls.js"
+type: "code"
+community: "WebRTC Calls"
+location: "L204"
+tags:
+  - graphify/code
+  - graphify/INFERRED
+  - community/WebRTC_Calls
+---
+
+# stopScreen()
+
+## Connections
+- [[callSig()]] - `calls` [INFERRED]
+- [[calls.js]] - `contains` [EXTRACTED]
+- [[renderCall()]] - `calls` [INFERRED]
+- [[toggleScreen()]] - `calls` [INFERRED]
+
+#graphify/code #graphify/INFERRED #community/WebRTC_Calls

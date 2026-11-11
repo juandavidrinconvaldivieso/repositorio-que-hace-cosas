@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Nada Messenger</title>
+<link rel="stylesheet" href="aero.css">
+<style>
+  .window { animation: fadein .4s ease-out; }
+  @keyframes fadein { from { opacity: 0; transform: translateY(20px); } }
+  .tbody { flex: 1; display: flex; align-items: center; gap: 10px; padding: 8px 10px; cursor: pointer; background: linear-gradient(#fff, #dfeaf7); }
+  .tbody:hover { background: linear-gradient(#fff, #cfe3f8); }
+  .tbody small { color: #3d7bad; text-decoration: underline; }
+</style>
+</head>
+<body>
+  <div class="window">
+    <div class="titlebar pywebview-drag-region" id="title">
+      <div class="ico"></div><div class="t">Nada Messenger</div>
+      <div class="caps"><div class="cap close" id="bClose" style="border-bottom-left-radius:5px">✕</div></div>
+    </div>
+    <div class="content">
+      <div class="tbody" id="tb"></div>
+    </div>
+  </div>
+<script src="common.js"></script>
+<script>
+  wireCaps();
+  onReady(async () => {
+    const d = await api().get_data();
+    const c = CONTACTS[d.contact];
+    $('tb').innerHTML = `${avatarHtml(c, c.status, 48)}<div><b>${esc(c.name)}</b> acaba de iniciar sesión.<br><small>Haz clic para no decirle nada.</small></div>`;
+    $('tb').onclick = () => { api().open_chat(d.contact, c.name); api().close(); };
+    sounds.online();
+    setTimeout(() => api().close(), 6000);
+  });
+</script>
+</body>
+</html>

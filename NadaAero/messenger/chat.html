@@ -1,0 +1,219 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Conversación</title>
+<link rel="stylesheet" href="aero.css">
+<style>
+  .chead { display: flex; align-items: center; gap: 10px; padding: 8px 10px; }
+  .chead .who { flex: 1; min-width: 0; }
+  .chead .nm { font-size: 16px; font-weight: 600; }
+  .chead .stt { font-size: 12px; opacity: .9; }
+  .chead .pm { font-size: 12px; font-style: italic; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .acts { display: flex; gap: 2px; }
+  .act { width: 32px; height: 30px; display: grid; place-items: center; font-size: 17px; border-radius: 3px; border: 1px solid transparent; text-shadow: none; }
+  .act:hover { background: linear-gradient(rgba(255,255,255,.65), rgba(255,255,255,.25)); border-color: rgba(255,255,255,.85); }
+
+  .cmain { flex: 1; display: flex; gap: 8px; padding: 8px; min-height: 0; background: linear-gradient(#eef4fc, #d6e4f5); }
+  .convcol { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+  .conv { flex: 1; overflow-y: auto; background: #fff; border: 1px solid #9fb6d3; border-radius: 3px; padding: 8px 10px; user-select: text; cursor: text; }
+  .m { margin-bottom: 7px; }
+  .m .w { color: #808080; }
+  .m .tx { padding-left: 14px; white-space: pre-wrap; word-wrap: break-word; }
+  .sys { color: #808080; margin: 6px 0; font-size: 12px; }
+  .sys::before { content: "• "; }
+  .sys q { display: block; padding-left: 14px; font-style: italic; color: #999; quotes: none; }
+  .typing { height: 18px; font-size: 12px; color: #555; padding: 2px; white-space: nowrap; overflow: hidden; }
+
+  .tools { display: flex; gap: 2px; padding: 0 0 3px; position: relative; }
+  .tool { height: 24px; padding: 0 7px; display: flex; align-items: center; gap: 4px; font-size: 12px; border: 1px solid transparent; border-radius: 3px; }
+  .tool:hover { background: linear-gradient(#f2f8fe, #d9ecfc); border-color: #a8d2f5; }
+  .tool .emo { font-size: 15px; }
+  .picker { position: absolute; bottom: 30px; left: 0; z-index: 10; display: none; grid-template-columns: repeat(6, 30px); gap: 2px; padding: 6px;
+    background: #fff; border: 1px solid #8b9fbd; border-radius: 3px; box-shadow: 0 4px 14px rgba(0,0,0,.25); }
+  .picker.show { display: grid; }
+  .picker span { font-size: 19px; height: 30px; display: grid; place-items: center; border-radius: 3px; border: 1px solid transparent; }
+  .picker span:hover { background: #e3f0fd; border-color: #a8d2f5; }
+
+  .compose { display: flex; gap: 6px; height: 72px; flex: none; }
+  .compose textarea { flex: 1; resize: none; border: 1px solid #9fb6d3; border-radius: 3px; padding: 6px; font: 13px "Segoe UI", sans-serif; }
+  .compose textarea:focus { outline: none; border-color: #3d7bad; }
+
+  .side { width: 104px; flex: none; display: flex; flex-direction: column; justify-content: space-between; align-items: center; }
+  @media (max-width: 460px) { .side { display: none; } }
+</style>
+</head>
+<body>
+  <div class="ray"></div><div class="sun"></div><div class="hill back"></div><div class="hill front"></div>
+  <div id="bubbles"></div>
+
+  <div class="window">
+    <div class="titlebar pywebview-drag-region" id="title">
+      <div class="ico"></div>
+      <div class="t" id="ctitle">Conversación</div>
+      <div class="caps">
+        <div class="cap" id="bMin" title="Minimizar">_</div>
+        <div class="cap" id="bMax" title="Maximizar">□</div>
+        <div class="cap close" id="bClose" title="Cerrar">✕</div>
+      </div>
+    </div>
+    <div class="content">
+      <div class="chead glasshead">
+        <div class="who">
+          <div><span class="nm" id="cname"></span> <span class="stt" id="cstat"></span></div>
+          <div class="pm" id="cpm"></div>
+        </div>
+        <div class="acts" id="acts">
+          <div class="act" data-a="invite" title="Invitar">👥</div>
+          <div class="act" data-a="files" title="Compartir archivos">📁</div>
+          <div class="act" data-a="video" title="Videollamada">📹</div>
+          <div class="act" data-a="games" title="Juegos">🎮</div>
+          <div class="act" data-a="block" title="Bloquear">🚫</div>
+        </div>
+      </div>
+
+      <div class="cmain">
+        <div class="convcol">
+          <div class="conv" id="conv"></div>
+          <div class="typing" id="typing"></div>
+          <div class="tools">
+            <div class="tool" id="tEmo" title="Emoticonos"><span class="emo">😊</span></div>
+            <div class="tool" id="tNudge" title="Enviar un zumbido"><span class="emo">📳</span>Zumbido</div>
+            <div class="tool" id="tFont" title="Cambiar fuente"><b style="font-family:Georgia">A</b>Fuente</div>
+            <div class="picker" id="picker"></div>
+          </div>
+          <div class="compose">
+            <textarea id="input" placeholder="Escribe algo que no servirá de nada..."></textarea>
+            <button class="btn" id="send">Enviar</button>
+          </div>
+        </div>
+        <div class="side">
+          <div id="cav"></div>
+          <div id="myav"></div>
+        </div>
+      </div>
+      <div class="status"><span id="st">Último mensaje recibido: nunca.</span><span id="fnt"></span></div>
+    </div>
+  </div>
+
+<script src="common.js"></script>
+<script>
+  let C, me;
+  const conv = $('conv');
+
+  function scrollDown() { conv.scrollTop = conv.scrollHeight; }
+  function addMsg(who, html, style = '') {
+    conv.insertAdjacentHTML('beforeend', `<div class="m"><div class="w">${esc(who)} dice:</div><div class="tx" style="${style}">${html}</div></div>`);
+    scrollDown();
+  }
+  function sys(html) { conv.insertAdjacentHTML('beforeend', `<div class="sys">${html}</div>`); scrollDown(); }
+  const now = () => new Date().toLocaleTimeString('es', { hour: '2-digit', minute: '2-digit' });
+
+  // ---------- Fuentes (muy 2009) ----------
+  const fonts = [
+    ['Segoe UI', '#000'], ['Comic Sans MS', '#7b1fa2'], ['Tahoma', '#1b7d1b'],
+    ['Times New Roman', '#c62828'], ['Lucida Console', '#1565c0'], ['Georgia', '#e65100']
+  ];
+  let fontI = 0;
+  const myStyle = () => `font-family:'${fonts[fontI][0]}';color:${fonts[fontI][1]}`;
+  function showFont() {
+    $('fnt').textContent = 'Fuente: ' + fonts[fontI][0];
+    $('input').style.fontFamily = fonts[fontI][0];
+    $('input').style.color = fonts[fontI][1];
+  }
+  $('tFont').onclick = () => { fontI = (fontI + 1) % fonts.length; showFont(); };
+
+  // ---------- Emoticonos ----------
+  $('picker').innerHTML = Object.entries(EMOTICONS).filter(([k]) => k !== '<3')
+    .map(([k, v]) => `<span class="emo" data-k="${esc(k)}" title="${esc(k)}">${v}</span>`).join('');
+  $('tEmo').onclick = e => { e.stopPropagation(); $('picker').classList.toggle('show'); };
+  $('picker').onclick = e => {
+    const k = e.target.closest('span')?.dataset.k; if (!k) return;
+    const ta = $('input'), p = ta.selectionStart;
+    ta.value = ta.value.slice(0, p) + k + ta.value.slice(ta.selectionEnd);
+    ta.focus(); ta.selectionStart = ta.selectionEnd = p + k.length;
+    $('picker').classList.remove('show');
+  };
+  document.addEventListener('click', () => $('picker').classList.remove('show'));
+
+  // ---------- Enviar y "recibir" ----------
+  let pending = [], warnedBusy = false;
+  function typing(on) { $('typing').textContent = on ? `${C.name} está escribiendo un mensaje...` : ''; }
+
+  function send() {
+    const t = $('input').value;
+    if (!t.trim()) return;
+    $('input').value = '';
+    addMsg(me.name, fmt(t), myStyle());
+
+    if (C.status === 'offline') {
+      setTimeout(() => sys(`No se pudo entregar el siguiente mensaje a todos los destinatarios:<q>${esc(t)}</q>`), 400);
+      return;
+    }
+    if (C.status === 'busy' && !warnedBusy) {
+      warnedBusy = true;
+      sys(`${esc(C.name)} está ocupado y puede que no responda. (Sí responderá. Nada útil.)`);
+    }
+    pending.forEach(clearTimeout); pending = []; typing(false);
+    const r = C.reply(t);
+    pending.push(setTimeout(() => {
+      typing(true);
+      pending.push(setTimeout(() => {
+        typing(false);
+        if (r.text != null) {
+          addMsg(C.name, r.html ? r.text : fmt(r.text));
+          sounds.msg();
+          $('st').textContent = `Último mensaje recibido a las ${now()}.`;
+        }
+        if (r.nudge) setTimeout(receiveNudge, 600);
+      }, r.typing || 1300));
+    }, 500 + Math.random() * 900));
+  }
+  $('send').onclick = send;
+  $('input').addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); } });
+
+  // ---------- Zumbidos ----------
+  let lastNudge = 0;
+  function shake() { sounds.nudge(); if (api()) api().nudge(); }
+  function receiveNudge() { sys(`${esc(C.name)} te ha enviado un zumbido.`); shake(); }
+  $('tNudge').onclick = () => {
+    if (Date.now() - lastNudge < 6000) return sys('No puedes enviar zumbidos con tanta frecuencia.');
+    lastNudge = Date.now();
+    sys('Has enviado un zumbido.');
+    shake();
+    if (C.status !== 'offline' && Math.random() < .5) setTimeout(receiveNudge, 2500);
+  };
+
+  // ---------- Botones inútiles ----------
+  const acts = {
+    invite: () => 'No hay nadie más a quien invitar.<br>Bueno, está Nadie, pero ya sabes cómo es.',
+    files:  () => 'Has enviado 0 archivos (0 KB).<br>Transferencia completada con éxito.',
+    video:  () => `La cámara de ${esc(C.name)} muestra exactamente lo que esperabas: nada.`,
+    games:  () => 'Juego disponible: Buscaminas sin minas.<br>Siempre ganas. Nunca juegas.',
+    block:  () => `Has bloqueado a ${esc(C.name)}.<br>No notarás ninguna diferencia.`
+  };
+  $('acts').onclick = e => { const a = e.target.closest('.act'); if (a) dialog(acts[a.dataset.a](), { title: a.title }); };
+
+  wireCaps();
+
+  // ---------- Arranque: Python nos dice con quién hablamos ----------
+  onReady(async () => {
+    const d = await api().get_data();
+    C = CONTACTS[d.contact];
+    me = d.me;
+    document.title = `${C.name} - Conversación`;
+    $('ctitle').textContent = `${C.name} - Conversación`;
+    $('cname').textContent = C.name;
+    $('cstat').textContent = `(${STATUS[C.status]})`;
+    $('cpm').innerHTML = C.music ? '<span class="emo">🎵</span> ' + esc(C.music) : esc(C.msg || '');
+    $('cav').innerHTML = avatarHtml(C, C.status, 96);
+    $('myav').innerHTML = avatarHtml(ME_PIC, me.status, 72);
+    if (C.status === 'offline')
+      sys(`${esc(C.name)} aparece como desconectado. Los mensajes que envíes se entregarán cuando inicie sesión (nunca).`);
+    showFont();
+    $('input').focus();
+  });
+  startBubbles(1800);
+</script>
+</body>
+</html>

@@ -1,0 +1,56 @@
+/* Teléfonos y pantallas estrechas: una columna cada vez + barra de navegación abajo */
+#mnav { display: none; }
+@media (max-width: 760px) {
+  html, body { height: 100%; }
+  .window { padding: 0 !important; border: 0 !important; }
+  .window > .titlebar, .menu, .status { display: none !important; }
+  .content { border: 0; }
+  .top { padding: 8px 10px; gap: 10px; }
+  .top .avatar { --s: 48px !important; }
+  #meName { font-size: 16px; max-width: 46vw; }
+  #meMsg { font-size: 12px; }
+  .mesub { display: none; }
+  .codebox { display: none; }
+  .cols { position: relative; }
+  .left, .center, .right { position: absolute; inset: 0; width: auto !important; border: 0 !important; display: none !important; }
+  body.mob-left .left, body.mob-right .right { display: flex !important; flex-direction: column; }
+  body.mob-right .right { display: block !important; }
+  body.mob-center .center { display: flex !important; }
+  .pcard { padding: 12px; }
+  .hstrip { grid-template-columns: 1fr; }
+  .hbody, .fbody { padding: 8px; }
+  .fpost { padding: 8px; }
+  .mgrid.n3 { grid-template-rows: 110px 110px; }
+  .hbar { flex-wrap: wrap; }
+  .crow { height: 56px; }
+  .ctools .tool span:not(.vlabel), .ctools .tool { font-size: 11px; }
+  .post { flex-direction: column; gap: 6px; }
+  .post .pa { width: auto; flex-direction: row; }
+  .dialog, #ed .dialog, #fcreate .dialog { width: 100% !important; max-width: 100% !important; }
+  .edgrid, .grid3, .presets, .moods { grid-template-columns: 1fr 1fr !important; }
+  .pane { height: 60vh !important; }
+  .overlay { padding: 6px; }
+  .callpanel { left: 6px !important; right: 6px !important; width: auto !important; bottom: 64px !important; top: auto !important; }
+  .callpanel.big { top: 6px !important; bottom: 64px !important; }
+  #dock { bottom: 64px; }
+  #webtoasts { left: 8px; right: 8px; bottom: 66px; }
+  .webtoast { width: auto; }
+  .short { padding: 0; gap: 0; }
+  .sframe { border-radius: 0; height: 100%; width: 100%; aspect-ratio: auto; }
+  .sside { position: absolute; right: 8px; bottom: 90px; z-index: 2; }
+  .sbtn { width: 48px; }
+  .sframe .wbar { opacity: 1; }
+  .auth { top: 0; left: 0; right: 0; bottom: 0; }
+  .authbox { width: 92vw; padding: 20px; }
+  .picker, #picker { width: calc(100vw - 16px) !important; left: 8px !important; }
+  .pgrid.emo { grid-template-columns: repeat(8, 1fr); }
+  .content { padding-bottom: 58px; }
+  #mnav { display: flex; position: fixed; left: 0; right: 0; bottom: 0; height: 58px; z-index: 44; padding-bottom: env(safe-area-inset-bottom);
+    background: linear-gradient(rgba(240,247,255,.97), rgba(214,230,248,.97)); border-top: 1px solid #9fb6d3; box-shadow: 0 -2px 8px rgba(0,40,100,.12); }
+  #mnav button { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; border: 0; background: none; font: 11px "Segoe UI", sans-serif; color: #4a5a6a; position: relative; }
+  #mnav button.on { color: var(--accent); font-weight: 700; }
+  #mnav .badge { position: absolute; top: 5px; left: calc(50% + 6px); }
+  .skin-discord #mnav { background: #1e1f22; border-color: #000; }
+  .skin-discord #mnav button { color: #949ba4; } .skin-discord #mnav button.on { color: #fff; }
+  .skin-insta #mnav { background: #fff; border-color: #dbdbdb; }
+}

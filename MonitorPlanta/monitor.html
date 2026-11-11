@@ -1,0 +1,839 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Monitor de Planta</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&display=swap" rel="stylesheet">
+<style>
+  /* Colores: "tinta" y "papel" se invierten según la cara (fondo blanco o negro) */
+  :root {
+    --ink: #000; --paper: #fff;
+    --luz: #ffd23f; --hum: #3fc5ff;
+    --ui-bg: #000; --ui-fg: #fff; --ui-dim: #8a8a8a;
+    --px: 4px;   /* tamaño de un "píxel" de la interfaz */
+    --font-title: "Press Start 2P", "Courier New", monospace;
+    --font-text: "VT323", "Courier New", monospace;
+  }
+  body.dark { --ink: #fff; --paper: #000; }
+
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; overflow: hidden; }
+  body { background: var(--paper); color: var(--ink); font: 22px/1.1 var(--font-text);
+         -webkit-font-smoothing: none; font-smooth: never; }
+  svg.pix { shape-rendering: crispEdges; display: block; fill: currentColor; }
+
+  /* ---------- Escenario: la cara a pantalla completa ---------- */
+  #stage { position: fixed; inset: 0; background: var(--paper); }
+  #face { position: absolute; inset: 64px 120px 60px; width: calc(100% - 240px); height: calc(100% - 124px);
+          object-fit: contain; image-rendering: pixelated; }
+
+  .topbar { position: absolute; top: 16px; left: 16px; right: 16px; display: flex; justify-content: space-between;
+            align-items: center; gap: 12px; z-index: 2; }
+  .topbar .right { display: flex; gap: 12px; }
+
+  /* Botones pixelados */
+  .pbtn { font: 12px/1 var(--font-title); color: var(--ink); background: var(--paper);
+          border: var(--px) solid var(--ink); padding: 10px 12px; cursor: pointer;
+          box-shadow: var(--px) var(--px) 0 var(--ink); display: inline-flex; align-items: center; gap: 10px; }
+  .pbtn:active { transform: translate(var(--px), var(--px)); box-shadow: none; }
+  .pbtn:disabled { opacity: .5; cursor: default; }
+  .ibtn { padding: 8px; }
+  .led { width: 12px; height: 12px; background: transparent; border: 3px solid var(--ink); }
+  .led.on { background: var(--ink); }
+
+  /* Barras laterales: un rectángulo que se escala dentro de otro */
+  /* Crédito al pie: canvas pixelado con contorno, visible sobre cualquier fondo */
+  #credit { position: absolute; left: 50%; bottom: 10px; transform: translateX(-50%); z-index: 2;
+            image-rendering: pixelated; pointer-events: none; display: block; }
+
+  .gauge { position: absolute; top: 96px; bottom: 60px; width: 64px; display: flex; flex-direction: column;
+           align-items: center; gap: 12px; z-index: 1; }
+  .gauge.left { left: 28px; } .gauge.right { right: 28px; }
+
+  /* Cada barra es un canvas pequeño dibujado píxel a píxel y ampliado sin suavizar */
+  .gauge.left > [data-icon] { color: #f9a825; }
+  .gauge.right > [data-icon] { color: #2f97e6; }
+  .barwrap { flex: 1; min-height: 0; display: flex; align-items: flex-end; }
+  .bar { width: calc(11 * var(--px)); image-rendering: pixelated; display: block; }
+
+  /* ---------- Panel de configuración ---------- */
+  #settings { position: fixed; top: 76px; right: 16px; z-index: 5; width: 420px; max-width: calc(100vw - 32px);
+              max-height: calc(100vh - 92px); overflow: auto; background: var(--ui-bg); color: var(--ui-fg);
+              border: var(--px) solid var(--ui-fg); box-shadow: 8px 8px 0 #0008; padding: 16px; display: none; }
+  #settings.open { display: block; }
+  #settings h3 { font: 11px/1 var(--font-title); margin: 20px 0 10px; display: flex; align-items: center; gap: 10px;
+                 text-transform: uppercase; }
+  #settings h3:first-child { margin-top: 0; }
+  .row { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 6px 0; }
+  .row > span { display: flex; gap: 6px; align-items: center; }
+  .row label { white-space: nowrap; }
+  #settings::-webkit-scrollbar, #log::-webkit-scrollbar { width: 12px; }
+  #settings::-webkit-scrollbar-track, #log::-webkit-scrollbar-track { background: #000; }
+  #settings::-webkit-scrollbar-thumb, #log::-webkit-scrollbar-thumb { background: #fff; border: 3px solid #000; }
+  .now { color: var(--ui-dim); font-size: 18px; }
+  #settings input[type=number], #settings select {
+    font: 20px/1 var(--font-text); background: #000; color: #fff; border: 3px solid #fff; border-radius: 0;
+    padding: 2px 6px; width: 76px; }
+  #settings select { width: auto; }
+  #settings input[type=checkbox] { appearance: none; width: 18px; height: 18px; border: 3px solid #fff; margin: 0 8px 0 0;
+    vertical-align: -2px; cursor: pointer; }
+  #settings input[type=checkbox]:checked { background: #fff; box-shadow: inset 0 0 0 3px #000; }
+  .sbtn { font: 9px/1 var(--font-title); color: #fff; background: #000; border: 3px solid #fff; padding: 6px 8px;
+          cursor: pointer; text-transform: uppercase; }
+  .sbtn:hover { background: #fff; color: #000; }
+  .sbtn.big { font-size: 10px; padding: 9px 10px; }
+  .sep { border: 0; border-top: 3px dashed #444; margin: 16px 0; }
+  .btnrow { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  #saveInfo { color: var(--ui-dim); font-size: 18px; }
+  .warn { color: #ff6b5a; }
+
+  #chart { width: 100%; image-rendering: pixelated; display: block; border: 3px solid #fff; background: #000; }
+  .legend { display: flex; gap: 16px; margin: 0 0 8px; font-size: 18px; }
+  .legend span { display: inline-flex; gap: 6px; align-items: center; }
+  .axis { display: flex; justify-content: space-between; color: var(--ui-dim); font-size: 16px; margin-top: 4px; }
+  #log { margin: 8px 0 0; max-height: 140px; overflow: auto; font: 16px/1.1 var(--font-text); color: #9f9;
+         background: #000; border: 3px solid #444; padding: 6px; white-space: pre-wrap; word-break: break-all; }
+
+  @media (max-width: 640px) {
+    :root { --px: 3px; }
+    #face { inset: 64px 64px 60px; width: calc(100% - 128px); }
+    .gauge { width: 40px; } .gauge.left { left: 12px; } .gauge.right { right: 12px; }
+    .pbtn { font-size: 10px; }
+  }
+</style>
+</head>
+<body class="dark">
+<div id="stage">
+  <img id="face" alt="Cara de la planta">
+
+  <div class="topbar">
+    <button class="pbtn" id="btnConnect" title="Conectar el Arduino por USB"><span class="led" id="led"></span><span id="statusText">CONECTAR</span></button>
+    <div class="right">
+      <button class="pbtn ibtn" id="btnFull" title="Pantalla completa"><span data-icon="full" data-px="3"></span></button>
+      <button class="pbtn ibtn" id="btnSettings" title="Configuración"><span data-icon="gear" data-px="3"></span></button>
+    </div>
+  </div>
+
+  <div class="gauge left" title="Luz">
+    <span data-icon="sun" data-px="4"></span>
+    <div class="barwrap"><canvas class="bar" id="luzBar"></canvas></div>
+  </div>
+  <div class="gauge right" title="Humedad">
+    <span data-icon="drop" data-px="4"></span>
+    <div class="barwrap"><canvas class="bar" id="humBar"></canvas></div>
+  </div>
+
+  <canvas id="credit" role="img" aria-label="Desarrollado por: Juan David Rincon V 801"></canvas>
+</div>
+
+<aside id="settings">
+  <h3>Conexion</h3>
+  <div class="btnrow">
+    <select id="baud" title="Velocidad (debe coincidir con Serial.begin)">
+      <option>9600</option><option>19200</option><option>57600</option><option>115200</option>
+    </select>
+    <button class="sbtn big" id="btnDemo">Modo demo</button>
+  </div>
+  <div class="warn" id="noSerial" style="display:none;margin-top:8px">Este navegador no puede leer el USB. Abre la pagina con Google Chrome o Microsoft Edge.</div>
+
+  <h3><span data-icon="sun" data-px="2" style="color:var(--luz)"></span>Luz</h3>
+  <div class="row"><label>En oscuridad</label><span><input type="number" id="luzMin"><button class="sbtn" data-cap="luzMin">Usar actual</button></span></div>
+  <div class="row"><label>Con mucha luz</label><span><input type="number" id="luzMax"><button class="sbtn" data-cap="luzMax">Usar actual</button></span></div>
+  <div class="row"><label>Cara "sin luz" bajo %</label><input type="number" id="luzLow"></div>
+  <div class="row"><label>Cara "mucho sol" sobre %</label><input type="number" id="luzHigh"></div>
+  <div class="now">Ahora: <span id="luzVal">--%</span> (crudo <span id="luzRaw">--</span>)</div>
+
+  <h3><span data-icon="drop" data-px="2" style="color:var(--hum)"></span>Humedad</h3>
+  <div class="row"><label><input type="checkbox" id="humPct">Ya viene en % (DHT)</label></div>
+  <div class="row"><label>Seco (al aire)</label><span><input type="number" id="humDry"><button class="sbtn" data-cap="humDry">Usar actual</button></span></div>
+  <div class="row"><label>Mojado (en agua)</label><span><input type="number" id="humWet"><button class="sbtn" data-cap="humWet">Usar actual</button></span></div>
+  <div class="row"><label>Cara "poca agua" bajo %</label><input type="number" id="humLow"></div>
+  <div class="row"><label>Cara "mucha agua" sobre %</label><input type="number" id="humHigh"></div>
+  <div class="now">Ahora: <span id="humVal">--%</span> (crudo <span id="humRaw">--</span>)</div>
+
+  <h3>Estabilidad</h3>
+  <div class="row"><label>Suavizado</label>
+    <select id="suav">
+      <option value="1">Ninguno</option>
+      <option value="0.5">Bajo</option>
+      <option value="0.2">Medio</option>
+      <option value="0.08">Alto</option>
+    </select>
+  </div>
+  <div class="row"><span id="saveInfo"></span><button class="sbtn" id="btnReset">Restaurar</button></div>
+
+  <hr class="sep">
+
+  <h3>Historial</h3>
+  <div class="legend">
+    <span style="color:var(--luz)"><span data-icon="sun" data-px="2"></span>Luz</span>
+    <span style="color:var(--hum)"><span data-icon="drop" data-px="2"></span>Humedad</span>
+  </div>
+  <canvas id="chart" width="240" height="80"></canvas>
+  <div class="axis"><span id="axisFrom">-5 min</span><span>ahora</span></div>
+  <div class="btnrow" style="margin-top:10px">
+    <select id="window">
+      <option value="60">1 min</option>
+      <option value="300" selected>5 min</option>
+      <option value="1800">30 min</option>
+      <option value="7200">2 horas</option>
+    </select>
+    <button class="sbtn" id="btnCsv">Descargar CSV</button>
+    <button class="sbtn" id="btnClear">Borrar</button>
+  </div>
+  <div class="now" style="margin-top:8px">Ultima lectura: <span id="lastTime">--</span> | Lecturas: <span id="count">0</span></div>
+
+  <h3>Datos recibidos</h3>
+  <pre id="log"></pre>
+</aside>
+
+<script>
+// ---------- Íconos dibujados píxel a píxel ('#' = píxel encendido) ----------
+const ICONS = {
+  sun: [
+    '.....#.....',
+    '.#...#...#.',
+    '..#.....#..',
+    '....###....',
+    '...#####...',
+    '##.#####.##',
+    '...#####...',
+    '....###....',
+    '..#.....#..',
+    '.#...#...#.',
+    '.....#.....',
+  ],
+  drop: [
+    '.....#.....',
+    '....###....',
+    '....###....',
+    '...#####...',
+    '..#######..',
+    '.##.######.',
+    '.#.#######.',
+    '.#########.',
+    '.#########.',
+    '..#######..',
+    '...#####...',
+  ],
+  gear: [
+    '....###....',
+    '.##.###.##.',
+    '.#########.',
+    '..##...##..',
+    '###.....###',
+    '###.....###',
+    '###.....###',
+    '..##...##..',
+    '.#########.',
+    '.##.###.##.',
+    '....###....',
+  ],
+  full: [
+    '####...####',
+    '#.........#',
+    '#.........#',
+    '#.........#',
+    '...........',
+    '...........',
+    '...........',
+    '#.........#',
+    '#.........#',
+    '#.........#',
+    '####...####',
+  ],
+};
+function iconSvg(name, px) {
+  const rows = ICONS[name], h = rows.length, w = rows[0].length;
+  let rects = '';
+  rows.forEach((r, y) => [...r].forEach((c, x) => { if (c === '#') rects += `<rect x="${x}" y="${y}" width="1" height="1"/>`; }));
+  return `<svg class="pix" viewBox="0 0 ${w} ${h}" width="${w * px}" height="${h * px}">${rects}</svg>`;
+}
+document.querySelectorAll('[data-icon]').forEach(el => { el.innerHTML = iconSvg(el.dataset.icon, +el.dataset.px || 3); });
+
+// ---------- Configuración: se guarda en cookie y, de respaldo, en el navegador ----------
+const DEFAULTS = { luzMin: 0, luzMax: 1023, luzLow: 20, luzHigh: 85,
+                   humPct: false, humDry: 1023, humWet: 300, humLow: 30, humHigh: 85,
+                   suav: 0.2 };
+const STORE = 'plantaCfg';
+let cfg = { ...DEFAULTS };
+const $ = id => document.getElementById(id);
+
+function readCookie(name) {
+  try {
+    const m = document.cookie.match(new RegExp('(?:^|; )' + name + '=([^;]*)'));
+    return m ? decodeURIComponent(m[1]) : null;
+  } catch (e) { return null; }
+}
+function loadCfg() {
+  let s = readCookie(STORE);
+  if (!s) try { s = localStorage.getItem(STORE); } catch (e) {}
+  if (s) try { Object.assign(cfg, JSON.parse(s)); } catch (e) {}
+}
+function saveCfg() {
+  const s = JSON.stringify(cfg);
+  try { document.cookie = `${STORE}=${encodeURIComponent(s)}; max-age=31536000; path=/; SameSite=Lax`; } catch (e) {}
+  let local = false;
+  try { localStorage.setItem(STORE, s); local = true; } catch (e) {}
+  const cookie = readCookie(STORE) === s;
+  $('saveInfo').textContent = cookie ? 'Guardado (cookie)' : local ? 'Guardado en este navegador' : 'No se pudo guardar';
+}
+loadCfg();
+
+function bindInputs() {
+  for (const k of Object.keys(DEFAULTS)) {
+    const el = $(k);
+    if (el.type === 'checkbox') el.checked = cfg[k]; else el.value = cfg[k];
+    el.onchange = () => {
+      cfg[k] = el.type === 'checkbox' ? el.checked : Number(el.value);
+      saveCfg(); render();
+    };
+  }
+}
+bindInputs();
+$('btnReset').onclick = () => {
+  if (!confirm('¿Volver a los valores de calibración por defecto?')) return;
+  cfg = { ...DEFAULTS }; saveCfg(); bindInputs(); render();
+};
+document.querySelectorAll('[data-cap]').forEach(b => b.onclick = () => {
+  if (!last) return alert('Primero conecta el Arduino para tener una lectura.');
+  const k = b.dataset.cap, src = k.startsWith('luz') ? last.luz : last.hum;
+  if (src == null) return;
+  cfg[k] = Math.round(src); $(k).value = cfg[k]; saveCfg(); render();
+});
+
+// Abrir / cerrar el panel de configuración
+$('btnSettings').onclick = e => { e.stopPropagation(); $('settings').classList.toggle('open'); drawChart(); };
+$('settings').onclick = e => e.stopPropagation();
+document.addEventListener('click', () => $('settings').classList.remove('open'));
+document.addEventListener('keydown', e => { if (e.key === 'Escape') $('settings').classList.remove('open'); });
+
+// Pantalla completa
+$('btnFull').onclick = () => {
+  if (document.fullscreenElement) document.exitFullscreen();
+  else document.documentElement.requestFullscreen?.();
+};
+
+// ---------- Datos ----------
+const data = [];          // { t, luz, hum, temp }
+const MAX_POINTS = 20000;
+let last = null, count = 0;
+
+// Convierte un valor crudo a % según dos puntos de calibración (sirve aunque estén invertidos)
+function toPct(raw, a, b) {
+  if (raw == null || a === b) return null;
+  return Math.max(0, Math.min(100, (raw - a) / (b - a) * 100));
+}
+const luzPct = d => toPct(d.luz, cfg.luzMin, cfg.luzMax);
+const humPct = d => d.hum == null ? null : (cfg.humPct ? Math.max(0, Math.min(100, d.hum)) : toPct(d.hum, cfg.humDry, cfg.humWet));
+
+// Acepta líneas como "luz=523;hum=687", "LUZ:523, HUM:687" o "523,687"
+function parseLine(line) {
+  line = line.trim();
+  if (!line) return null;
+  const out = {};
+  const re = /([a-zA-Z_áéíóú]+)\s*[:=]\s*(-?\d+(?:\.\d+)?)/g;
+  let m, any = false;
+  while ((m = re.exec(line))) {
+    any = true;
+    const key = m[1].toLowerCase(), v = +m[2];
+    if (key.startsWith('luz') || key.startsWith('light') || key === 'ldr') out.luz = v;
+    else if (key.startsWith('hum') || key.startsWith('moist') || key.startsWith('suelo')) out.hum = v;
+    else if (key.startsWith('temp')) out.temp = v;
+  }
+  if (!any) {
+    const nums = line.split(/[,;\s\t]+/).map(Number).filter(n => !isNaN(n));
+    if (nums.length >= 2) { out.luz = nums[0]; out.hum = nums[1]; if (nums.length >= 3) out.temp = nums[2]; }
+  }
+  return (out.luz != null || out.hum != null) ? out : null;
+}
+
+const logLines = [];
+function addLog(text) {
+  logLines.push(text);
+  if (logLines.length > 200) logLines.shift();
+  const el = $('log');
+  const atBottom = el.scrollTop + el.clientHeight >= el.scrollHeight - 5;
+  el.textContent = logLines.join('\n');
+  if (atBottom) el.scrollTop = el.scrollHeight;
+}
+
+// Suavizado: cada lectura nueva solo mueve el valor una fracción (cfg.suav)
+// hacia el dato recibido, así los saltos sueltos casi no se notan.
+const ema = {};
+function smooth(key, v) {
+  if (v == null) return null;
+  ema[key] = ema[key] == null ? v : ema[key] + cfg.suav * (v - ema[key]);
+  return ema[key];
+}
+
+function handleLine(line) {
+  addLog(line);
+  const d = parseLine(line);
+  if (!d) return;
+  d.luz = smooth('luz', d.luz);
+  d.hum = smooth('hum', d.hum);
+  d.temp = smooth('temp', d.temp);
+  d.t = Date.now();
+  data.push(d);
+  if (data.length > MAX_POINTS) data.shift();
+  last = d; count++;
+  render();
+}
+
+// ---------- Caras ----------
+// Caras ya limpias e invertidas por limpiar_caras.py (las originales quedan en Caras/).
+// Las imágenes van incrustadas aquí abajo, así la página funciona sola en cualquier
+// computadora. Si una cara no está incrustada, se busca en la carpeta Caras_limpias.
+// CARAS-INICIO (lo genera limpiar_caras.py, no editar a mano)
+const CARAS_DATA = {
+ "Animacion/0000.png": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAIAAAABACAAAAAD3vSCjAAAA0klEQVR42u2YwQ7DIAxDMdr//7J33A7riBcIdHKODS4PE6VKW3M4NgcuMwyuS+oRUesMcT2icoVB0UOQBxE0fdf0g+wP+q7ukM2PHSiOcgAuBmDWAf79FRggD8CjHWAWgOWNwEVoAAMYwAAGMEDfPY93efTD0Q7ANXB/ANzdARx/BRgBoLYNfHAAuf0hpiHNV0jOZ4i+kjn7FTni70BuSoV+KH5bxvdnHP3wvN7msa7gsboP8JxOyB0AmGRBz5+czJQLphiPtgPghVD+DXc4HDPjCXcpKF6qWG4VAAAAAElFTkSuQmCC",
+ "Animacion/0001.png": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAIAAAABACAAAAAD3vSCjAAAAzElEQVR42u2YwQ7DIAxDMdr//7J3mnrouiUyEKratwoMj5BQQWuWZVlPFy5bGO2o+RFyZxkYnwthe5wh5UfKH0FI2ntygKbNf27u2fk5uAr66rLjZACqEeDqiCzfAgPoABxbpL04Bwu2gE5CAxjAAAYwQDUAfgJAuU3uEAE4B2QA3D0C2H4L8A8A4hKhh4zi8Dk/UkNAvLtg1SPVVz+kZzqcm3HxEfN/9Jp25mN6GXKfg4gVABgUgq6vnFQSBkMCj1YBcCAs/4ValjVSb0+JJlOfq7L7AAAAAElFTkSuQmCC",
+ "Animacion/0002.png": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAIAAAABACAAAAAD3vSCjAAAApklEQVR42u2VwRLDIAhEWab//8v02KRtZrqRhB7euznKuqJCBAAAAAAAAAAADKO3cVmrD3BEZET+aMETSS80OvbfkWZodexf3w3UyCPMZr1yV+X0N8yL39jtV3C9Af15BrRgQDHRADKGU5BmrDocHPYCR722/3E3kGXx8TlVq6m1VLRQczfpOK+TAx24x4CaqnKun7xqpYaoJfGKCQMvCzfWUADo5wlPZx0ozFLSrQAAAABJRU5ErkJggg==",
+ "Animacion/0003.png": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAIAAAABACAAAAAD3vSCjAAAAdElEQVR42u3TsQ6AMAhFUSD+/y8/F1M7NFEK0eWeycFCeaRmAAAAAAAAAADgZ35/KntgSckinmv/dIN8lUhndvXQ3EvaXkFUltZhXMA923819csq029Hx2gqBBSF56PWFexPLlXSc+sIvlDF6wm0PwwA3zoBnTARFF9U5RAAAAAASUVORK5CYII=",
+ "Animacion/0004.png": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAIAAAABACAAAAAD3vSCjAAAAgUlEQVR42u3UQQ6AIAxE0U7j/a9ctyZqcCyRhf/tiGWkCkQAAAAAAAAAAP5Ox0GZ9ZfMkPSmjmvckPSmDqvskFy9B7K1aeYuwIuuuhzI7SLN5oY1kheiB/tEN891GOhVSERsM/51NUKycYPVklNw7ryqczbUfX03Rf0vMP9uAPCpHQbgGRX9PkbGAAAAAElFTkSuQmCC",
+ "Animacion/0005.png": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAIAAAABACAAAAAD3vSCjAAAApklEQVR42u2VwRLDIAhEWab//8v02KRtZrqRhB7euznKuqJCBAAAAAAAAAAADKO3cVmrD3BEZET+aMETSS80OvbfkWZodexf3w3UyCPMZr1yV+X0N8yL39jtV3C9Af15BrRgQDHRADKGU5BmrDocHPYCR722/3E3kGXx8TlVq6m1VLRQczfpOK+TAx24x4CaqnKun7xqpYaoJfGKCQMvCzfWUADo5wlPZx0ozFLSrQAAAABJRU5ErkJggg==",
+ "Animacion/0006.png": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAIAAAABACAAAAAD3vSCjAAAAzElEQVR42u2YwQ7DIAxDMdr//7J3mnrouiUyEKratwoMj5BQQWuWZVlPFy5bGO2o+RFyZxkYnwthe5wh5UfKH0FI2ntygKbNf27u2fk5uAr66rLjZACqEeDqiCzfAgPoABxbpL04Bwu2gE5CAxjAAAYwQDUAfgJAuU3uEAE4B2QA3D0C2H4L8A8A4hKhh4zi8Dk/UkNAvLtg1SPVVz+kZzqcm3HxEfN/9Jp25mN6GXKfg4gVABgUgq6vnFQSBkMCj1YBcCAs/4ValjVSb0+JJlOfq7L7AAAAAElFTkSuQmCC",
+ "Animacion/0007.png": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAIAAAABACAAAAAD3vSCjAAAA0klEQVR42u2YwQ7DIAxDMdr//7J33A7riBcIdHKODS4PE6VKW3M4NgcuMwyuS+oRUesMcT2icoVB0UOQBxE0fdf0g+wP+q7ukM2PHSiOcgAuBmDWAf79FRggD8CjHWAWgOWNwEVoAAMYwAAGMEDfPY93efTD0Q7ANXB/ANzdARx/BRgBoLYNfHAAuf0hpiHNV0jOZ4i+kjn7FTni70BuSoV+KH5bxvdnHP3wvN7msa7gsboP8JxOyB0AmGRBz5+czJQLphiPtgPghVD+DXc4HDPjCXcpKF6qWG4VAAAAAElFTkSuQmCC",
+ "Animacion/0008.png": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAIAAAABACAAAAAD3vSCjAAAA0klEQVR42u2YwQ7DIAxDMdr//7J33A7riBcIdHKODS4PE6VKW3M4NgcuMwyuS+oRUesMcT2icoVB0UOQBxE0fdf0g+wP+q7ukM2PHSiOcgAuBmDWAf79FRggD8CjHWAWgOWNwEVoAAMYwAAGMEDfPY93efTD0Q7ANXB/ANzdARx/BRgBoLYNfHAAuf0hpiHNV0jOZ4i+kjn7FTni70BuSoV+KH5bxvdnHP3wvN7msa7gsboP8JxOyB0AmGRBz5+czJQLphiPtgPghVD+DXc4HDPjCXcpKF6qWG4VAAAAAElFTkSuQmCC",
+ "Animacion/0009.png": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAIAAAABACAAAAAD3vSCjAAAA0klEQVR42u2YwQ7DIAxDMdr//7J33A7riBcIdHKODS4PE6VKW3M4NgcuMwyuS+oRUesMcT2icoVB0UOQBxE0fdf0g+wP+q7ukM2PHSiOcgAuBmDWAf79FRggD8CjHWAWgOWNwEVoAAMYwAAGMEDfPY93efTD0Q7ANXB/ANzdARx/BRgBoLYNfHAAuf0hpiHNV0jOZ4i+kjn7FTni70BuSoV+KH5bxvdnHP3wvN7msa7gsboP8JxOyB0AmGRBz5+czJQLphiPtgPghVD+DXc4HDPjCXcpKF6qWG4VAAAAAElFTkSuQmCC",
+ "Animacion/0010.png": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAIAAAABACAAAAAD3vSCjAAAA0klEQVR42u2YwQ7DIAxDMdr//7J33A7riBcIdHKODS4PE6VKW3M4NgcuMwyuS+oRUesMcT2icoVB0UOQBxE0fdf0g+wP+q7ukM2PHSiOcgAuBmDWAf79FRggD8CjHWAWgOWNwEVoAAMYwAAGMEDfPY93efTD0Q7ANXB/ANzdARx/BRgBoLYNfHAAuf0hpiHNV0jOZ4i+kjn7FTni70BuSoV+KH5bxvdnHP3wvN7msa7gsboP8JxOyB0AmGRBz5+czJQLphiPtgPghVD+DXc4HDPjCXcpKF6qWG4VAAAAAElFTkSuQmCC",
+ "Animacion/0011.png": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAIAAAABACAAAAAD3vSCjAAAA0klEQVR42u2YwQ7DIAxDMdr//7J33A7riBcIdHKODS4PE6VKW3M4NgcuMwyuS+oRUesMcT2icoVB0UOQBxE0fdf0g+wP+q7ukM2PHSiOcgAuBmDWAf79FRggD8CjHWAWgOWNwEVoAAMYwAAGMEDfPY93efTD0Q7ANXB/ANzdARx/BRgBoLYNfHAAuf0hpiHNV0jOZ4i+kjn7FTni70BuSoV+KH5bxvdnHP3wvN7msa7gsboP8JxOyB0AmGRBz5+czJQLphiPtgPghVD+DXc4HDPjCXcpKF6qWG4VAAAAAElFTkSuQmCC",
+ "Animacion/0012.png": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAIAAAABACAAAAAD3vSCjAAAA0klEQVR42u2YwQ7DIAxDMdr//7J33A7riBcIdHKODS4PE6VKW3M4NgcuMwyuS+oRUesMcT2icoVB0UOQBxE0fdf0g+wP+q7ukM2PHSiOcgAuBmDWAf79FRggD8CjHWAWgOWNwEVoAAMYwAAGMEDfPY93efTD0Q7ANXB/ANzdARx/BRgBoLYNfHAAuf0hpiHNV0jOZ4i+kjn7FTni70BuSoV+KH5bxvdnHP3wvN7msa7gsboP8JxOyB0AmGRBz5+czJQLphiPtgPghVD+DXc4HDPjCXcpKF6qWG4VAAAAAElFTkSuQmCC",
+ "Animacion/0013.png": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAIAAAABACAAAAAD3vSCjAAAA0klEQVR42u2YwQ7DIAxDMdr//7J33A7riBcIdHKODS4PE6VKW3M4NgcuMwyuS+oRUesMcT2icoVB0UOQBxE0fdf0g+wP+q7ukM2PHSiOcgAuBmDWAf79FRggD8CjHWAWgOWNwEVoAAMYwAAGMEDfPY93efTD0Q7ANXB/ANzdARx/BRgBoLYNfHAAuf0hpiHNV0jOZ4i+kjn7FTni70BuSoV+KH5bxvdnHP3wvN7msa7gsboP8JxOyB0AmGRBz5+czJQLphiPtgPghVD+DXc4HDPjCXcpKF6qWG4VAAAAAElFTkSuQmCC",
+ "Animacion_2/0000.png": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAIAAAABACAAAAAD3vSCjAAAA50lEQVR42u2XwQ7DIAxDn1H//5e9y6RJVbuV0WEmxRcuJDGBEEekYBDQyEEAW+DgAHquuQzouW6pwKQzANhgkSyDg4zMrEHnCPgVuUXj2/OrYF8LWzZ8tgyLQKFQKKwBnQvXi7t77A88qMP4EoleB63X/MOWbgft69Hi2/hvu6G5ZexZvR37lID5D0HiXxEw859Abi6IElhWlqvmgoEOukYGNEpAAQ2y2BvQYKKl8WvzZEWkQUnXyUEdHj32wv3D0i2Q/rz216wQAd/ipd0iaxxvRp5PwIu1Y6cJKExAAUsDcv3xhcIwHttpLk9FDQwJAAAAAElFTkSuQmCC",
+ "Animacion_2/0001.png": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAIAAAABACAAAAAD3vSCjAAABPElEQVR42u2ZQZbDIAxDI97c/8q/m06HAM4AhZC0Zm2MkIwhitjWjrA5AAdw3pDWAlA1A9I31cBPK280Tvg3nlIODlSjXem/dNQwoKOa6S0/E8OLAe0R28vTU+vPecpzhOK8GedA0e6j/Iq4ETXk00dAUgyvNCHShuld4Jmboz4wuQkpLbLQvL7GNuTwKw6nXglkEnCR61jb1e6CWYNPfRHpDu8BzQTA17+Kl9cAzoB/mt0BAC7BpQEw46S5BIcMhrkEn88AXgOtFIVWDlnMAG8GUOcRvbf/pvklAGYGLKcpMbjUAF9U74LU3LARmNPrAeS2VWaulCynOEJV0oneT3srv9qOSjUApUspdt6wHYghAApka8cFZfEY2wfALG6VAzVMgjxMezoossYwh6SjAXOT21D+49IBOIDVAB7PFFxwB8NQ4gAAAABJRU5ErkJggg==",
+ "Animacion_2/0002.png": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAIAAAABACAAAAAD3vSCjAAAAz0lEQVR42u2WQQ7AIAgEXdL/f3l7aNJLbQRipSpzNIAICJSSJEmSJEmSJMnuQCtInQKNZhWStCjQbB4qO1qbDr3DaMYP6z7IU5CmlBh9aDvAL0uebQf47aejIgV9H9hEohuRhHS1ZSPgKROJnj0TpgBz18D/HcDcEYBd4H81gLGfwLqSwTsSUVaiurSRk/aBo8NoQ1AfuIPO8EbEsQ7w5VYGFiEHpwD1M27yDfmIxHUCFmLAKs9XHbpagnS7v8BVjdKx3OEZCV23Yqw1dHfhBEBKLTpFnqdJAAAAAElFTkSuQmCC",
+ "Animacion_2/0003.png": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAIAAAABACAAAAAD3vSCjAAABSklEQVR42u2Y2w7DMAhDOVH//5e9h2nTLr0FWFi39qlq1UCIa4yR1V7N/j2BKWkdzMxUVwFMqjwCTGa6luGvQMhtyyr7C3i4oRKEMnzxg7+hZu5GVkAjiIgPBH1aX1sRe7dN39etN76F4tcTEVsJYEfrhgRx2cIgfu5B9J5Bi5+iMpsRjnwolWRy9qA8EOq7RCmnLD8TOEAC/NJoRjkPSKUYoBqEMlCUu6dqWf4TBgWRarTuoq4OEiqpgMxccEzCADE8TruqzTgQatb00EoO1y9IroDmnrBsUd2V6W0D2kuZb9hZbTALL3k5La0Qt3aM59rw4/yjGnsSOCWZnW65C2XuCbGFLNrHB4xKQAvUoiybzqGGGe2UKtEmal4FQLkkI0edHliUKmdAaSnuJIMTeIk/3Cklc0zsJyLmmWBoL3ibyuUvQpoi8i50AcxqVJQeAA2UAAAAAElFTkSuQmCC"
+};
+// CARAS-FIN
+const cara = ruta => CARAS_DATA[ruta] || ('Caras_limpias/' + ruta);
+const BLINK_FRAMES = Array.from({ length: 14 }, (_, i) => cara(`Animacion/${String(i).padStart(4, '0')}.png`));
+const BLINK_DARK = true;
+// dark = la imagen tiene fondo negro, así que toda la pantalla se vuelve negra
+const FACES = {
+  pocaAgua:  { src: cara('Animacion_2/0002.png'), msg: 'Tengo sed... riegame!', dark: true },
+  muchaAgua: { src: cara('Animacion_2/0003.png'), msg: 'Me ahogo! Mucha agua',  dark: false },
+  sinLuz:    { src: cara('Animacion_2/0001.png'), msg: 'Esta muy oscuro...',    dark: false },
+  muchoSol:  { src: cara('Animacion_2/0000.png'), msg: 'Demasiado sol!',        dark: true },
+};
+// Precarga todas las imágenes para que el cambio de cuadro sea instantáneo
+[...BLINK_FRAMES, ...Object.values(FACES).map(f => f.src)].forEach(src => { new Image().src = src; });
+
+let problems = [];                 // caras de problema activas, en orden de prioridad
+function computeProblems() {
+  problems = [];
+  if (!last) return;
+  const l = luzPct(last), h = humPct(last);
+  if (h != null && h < cfg.humLow) problems.push('pocaAgua');
+  if (h != null && h > cfg.humHigh) problems.push('muchaAgua');
+  if (l != null && l < cfg.luzLow) problems.push('sinLuz');
+  if (l != null && l > cfg.luzHigh) problems.push('muchoSol');
+}
+
+const FPS = 24;
+let blinkIdx = -1;                 // -1 = ojos abiertos esperando el próximo parpadeo
+let nextBlink = Date.now() + randBlinkDelay();
+let shownSrc = '', shownMsg = null;
+function randBlinkDelay() { return 2000 + Math.random() * 3000; }   // entre 2 y 5 segundos
+
+function setFace(src, msg, dark) {
+  if (src !== shownSrc) { $('face').src = src; shownSrc = src; }
+  if (msg !== shownMsg) { $('face').alt = msg; shownMsg = msg; }   // no se muestra, solo describe la cara
+  if (document.body.classList.contains('dark') !== dark) {
+    document.body.classList.toggle('dark', dark);
+    redrawBars();                                // los colores de las barras se invierten
+  }
+}
+
+// ---------- Barras pixeladas con "shaders" de océano y sol ----------
+// Medidas en píxeles de la barra: borde 1 + hueco 1 + relleno 7 + hueco 1 + borde 1 = 11
+// Cada cuadro se calcula un valor 0..1 por píxel y se pasa a una paleta corta con
+// dithering ordenado (matriz Bayer 4x4), como en los juegos retro.
+const hexRgb = h => { h = h.trim().replace('#', ''); if (h.length === 3) h = [...h].map(c => c + c).join('');
+                      return [0, 2, 4].map(i => parseInt(h.slice(i, i + 2), 16)); };
+const PALETTES = {
+  //        fondo profundo ........................................ espuma
+  hum: ['#06183d', '#0b2f6b', '#124c9c', '#1b6fc7', '#2f97e6', '#6cc6f5', '#c9f1ff', '#ffffff'].map(hexRgb),
+  //        brasa ................................................. núcleo blanco
+  luz: ['#5a1300', '#9a2d03', '#d4520a', '#f07c12', '#f9a825', '#fcd34d', '#fff1a8', '#ffffff'].map(hexRgb),
+};
+const BAYER = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5].map(v => (v + 0.5) / 16);
+function dither(v, x, y, n) {
+  const i = Math.floor(v * (n - 1) + BAYER[(y & 3) * 4 + (x & 3)]);
+  return i < 0 ? 0 : i >= n ? n - 1 : i;
+}
+
+// Océano: x = columna 0..6, d = filas bajo la superficie, depth = altura del agua, t = segundos
+function oceanShader(x, y, d, depth, t) {
+  if (d === 0) return 1;                                           // espuma
+  let v = 0.80 - 0.55 * d / Math.max(depth, 20);                   // más oscuro al fondo
+  v += 0.11 * Math.sin(x * 1.1 + y * 0.35 + t * 2.2) * Math.sin(y * 0.55 - t * 1.4);   // cáusticas
+  if (d === 1) v = Math.max(v, 0.82);
+  if (x === 1) v += 0.08;                                          // brillo del tubo
+  v -= 0.08 * Math.max(0, x - 3);                                  // lado en sombra
+  return v;
+}
+// Olas: desplazamiento de la superficie por columna (-2..2)
+const oceanWave = (x, t) => Math.round(Math.sin(x * 0.9 + t * 3) * 0.8 + Math.sin(x * 0.45 - t * 1.7) * 0.7);
+
+// Sol: ondas de calor que suben, núcleo brillante arriba y brasas abajo
+function sunShader(x, y, d, depth, t) {
+  if (d === 0) return 0.97;
+  let v = 0.42 + 0.45 * (1 - d / Math.max(depth, 16));
+  v += 0.13 * Math.sin(y * 0.45 + t * 4 + Math.sin(x * 0.9 + t * 1.3) * 1.5);    // calor subiendo
+  v += 0.05 * Math.sin(t * 2.5);                                   // pulso del brillo
+  if (x === 1) v += 0.08;
+  v -= 0.08 * Math.max(0, x - 3);
+  return v;
+}
+// Llamas: la superficie se levanta 0..2 píxeles de forma irregular
+const sunFlame = (x, t) => -Math.round(Math.max(0, Math.sin(x * 1.7 + t * 6) + Math.sin(x * 0.7 - t * 4.3)));
+
+const BARS = {
+  luz: { el: $('luzBar'), target: 0, shown: 0, pal: PALETTES.luz, shader: sunShader,   surface: sunFlame,  parts: [] },
+  hum: { el: $('humBar'), target: 0, shown: 0, pal: PALETTES.hum, shader: oceanShader, surface: oceanWave, parts: [] },
+};
+
+function drawBar(b, t) {
+  const css = getComputedStyle(document.body);
+  const u = parseFloat(css.getPropertyValue('--px')) || 4;
+  const W = 11, H = Math.max(12, Math.floor(b.el.parentElement.clientHeight / u));
+  if (b.el.width !== W || b.el.height !== H) {
+    b.el.width = W; b.el.height = H;
+    b.el.style.height = H * u + 'px';            // altura exacta: cada píxel mide lo mismo
+    b.img = null;
+  }
+  const ctx = b.el.getContext('2d');
+  if (!b.img) b.img = ctx.createImageData(W, H);
+  const px = b.img.data, paper = hexRgb(css.getPropertyValue('--paper')), ink = hexRgb(css.getPropertyValue('--ink'));
+  const set = (x, y, c) => { const i = (y * W + x) * 4; px[i] = c[0]; px[i + 1] = c[1]; px[i + 2] = c[2]; px[i + 3] = 255; };
+
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) set(x, y, paper);
+
+  const pal = b.pal, n = pal.length;
+  const bottom = H - 3;                          // última fila del relleno
+  const level = Math.round(b.shown / 100 * (H - 4));
+  const surf = [];                               // fila de la superficie en cada columna
+  for (let x = 0; x < 7; x++) {
+    let s = bottom - level + 1;
+    if (level > 2) s += b.surface(x, t);
+    surf.push(Math.max(2, s));
+  }
+  if (level > 0) {
+    for (let x = 0; x < 7; x++)
+      for (let y = surf[x]; y <= bottom; y++)
+        set(2 + x, y, pal[dither(b.shader(x, y, y - surf[x], level, t), x, y, n)]);
+  }
+
+  // Partículas: burbujas que suben dentro del agua / chispas que saltan del sol
+  const isSun = b.shader === sunShader;
+  if (isSun) {
+    if (level > 0 && Math.random() < 0.18)
+      b.parts.push({ x: Math.floor(Math.random() * 7), y: Math.min(...surf) - 1, vy: -(0.35 + Math.random() * 0.6), age: 0 });
+  } else if (level > 6 && Math.random() < 0.09) {
+    b.parts.push({ x: Math.floor(Math.random() * 7), y: bottom, vy: -(0.25 + Math.random() * 0.4), age: 0 });
+  }
+  b.parts = b.parts.filter(p => {
+    p.y += p.vy; p.age++;
+    const xi = Math.max(0, Math.min(6, Math.round(p.x + (isSun ? 0 : Math.sin(p.age * 0.4) * 0.6))));
+    const yi = Math.round(p.y);
+    if (isSun) {
+      if (yi < 2 || p.age > 30) return false;
+      if (yi >= surf[xi]) return true;            // todavía dentro del sol
+      set(2 + xi, yi, pal[Math.max(3, n - 1 - Math.floor(p.age / 7))]);   // se enfría al subir
+    } else {
+      if (yi <= surf[xi] + 1) return false;       // la burbuja llegó a la superficie
+      set(2 + xi, yi, pal[n - 2]);
+    }
+    return true;
+  });
+
+  for (let x = 0; x < W; x++) { set(x, 0, ink); set(x, H - 1, ink); }      // borde
+  for (let y = 0; y < H; y++) { set(0, y, ink); set(W - 1, y, ink); }
+  ctx.putImageData(b.img, 0, 0);
+}
+function redrawBars() { const t = performance.now() / 1000; for (const b of Object.values(BARS)) drawBar(b, t); }
+window.addEventListener('resize', redrawBars);
+
+// ---------- Crédito con shader holográfico ----------
+const CREDIT_TEXT = 'DESARROLLADO POR: JUAN DAVID RINCON V 801';
+// Letra pixelada propia de 5x7 (no depende de fuentes de internet)
+const FONT = {
+  A: ['.###.', '#...#', '#...#', '#####', '#...#', '#...#', '#...#'],
+  C: ['.###.', '#...#', '#....', '#....', '#....', '#...#', '.###.'],
+  D: ['####.', '#...#', '#...#', '#...#', '#...#', '#...#', '####.'],
+  E: ['#####', '#....', '#....', '####.', '#....', '#....', '#####'],
+  I: ['.###.', '..#..', '..#..', '..#..', '..#..', '..#..', '.###.'],
+  J: ['..###', '...#.', '...#.', '...#.', '#..#.', '#..#.', '.##..'],
+  L: ['#....', '#....', '#....', '#....', '#....', '#....', '#####'],
+  N: ['#...#', '##..#', '#.#.#', '#..##', '#...#', '#...#', '#...#'],
+  O: ['.###.', '#...#', '#...#', '#...#', '#...#', '#...#', '.###.'],
+  P: ['####.', '#...#', '#...#', '####.', '#....', '#....', '#....'],
+  R: ['####.', '#...#', '#...#', '####.', '#.#..', '#..#.', '#...#'],
+  S: ['.####', '#....', '#....', '.###.', '....#', '....#', '####.'],
+  U: ['#...#', '#...#', '#...#', '#...#', '#...#', '#...#', '.###.'],
+  V: ['#...#', '#...#', '#...#', '#...#', '#...#', '.#.#.', '..#..'],
+  0: ['.###.', '#...#', '#..##', '#.#.#', '##..#', '#...#', '.###.'],
+  1: ['..#..', '.##..', '..#..', '..#..', '..#..', '..#..', '.###.'],
+  8: ['.###.', '#...#', '#...#', '.###.', '#...#', '#...#', '.###.'],
+  ':': ['.....', '..#..', '..#..', '.....', '..#..', '..#..', '.....'],
+  ' ': ['...', '...', '...', '...', '...', '...', '...'],
+};
+// Posiciones (x, y) de cada píxel encendido del texto, calculadas una sola vez
+const CREDIT = (() => {
+  const pts = []; let cx = 0;
+  [...CREDIT_TEXT].forEach((ch, li) => {
+    const g = FONT[ch] || FONT[' '];
+    g.forEach((row, y) => [...row].forEach((c, x) => { if (c === '#') pts.push([cx + x, y, li]); }));
+    cx += g[0].length + 1;
+  });
+  return { pts, w: cx - 1 };
+})();
+const CW = CREDIT.w + 4, CH = 7 + 6;           // margen para contorno y ondulación
+
+function hsl(h, s, l) {                         // HSL -> [r, g, b]
+  s /= 100; l /= 100;
+  const k = n => (n + h / 30) % 12, a = s * Math.min(l, 1 - l);
+  return [0, 8, 4].map(n => Math.round(255 * (l - a * Math.max(-1, Math.min(k(n) - 3, 9 - k(n), 1)))));
+}
+
+function drawCredit(t) {
+  const c = $('credit');
+  if (c.width !== CW) { c.width = CW; c.height = CH; }
+  const s = Math.max(1, Math.min(3, Math.floor((window.innerWidth - 24) / CW)));
+  if (c.dataset.s != s) { c.style.width = CW * s + 'px'; c.style.height = CH * s + 'px'; c.dataset.s = s; }
+
+  const ctx = c.getContext('2d');
+  const img = ctx.createImageData(CW, CH), d = img.data;
+  const text = new Uint8Array(CW * CH);
+  // 1) Texto ondeando como bandera (cada letra sube y baja entera, sin deformarse)
+  for (const [x, y, li] of CREDIT.pts) {
+    const px = x + 2, py = y + 3 + Math.round(Math.sin(li * 0.55 - t * 4) * 1.3);
+    text[py * CW + px] = 1;
+  }
+  const put = (i, r, g, b) => { d[i * 4] = r; d[i * 4 + 1] = g; d[i * 4 + 2] = b; d[i * 4 + 3] = 255; };
+  for (let y = 0; y < CH; y++) for (let x = 0; x < CW; x++) {
+    const i = y * CW + x;
+    if (text[i]) {
+      // 2) Holograma: arcoíris que corre, cuantizado a 12 tonos para que se vea pixel art
+      const hue = Math.floor(((x * 4 - t * 120) % 360 + 360) % 360 / 30) * 30;
+      const above = y > 0 && text[i - CW], below = y < CH - 1 && text[i + CW];
+      let light = 62 + (above ? 0 : 12) - (below ? 0 : 12);      // biselado: borde de arriba claro, de abajo oscuro
+      // 3) Destello blanco que cruza en diagonal cada ~3 segundos
+      const sweep = ((x + y * 2 - t * 90) % 270 + 270) % 270;
+      if (sweep < 3) light = 96; else if (sweep < 6) light = Math.max(light, 82);
+      const [r, g, b] = hsl(hue, 95, light);
+      put(i, r, g, b);
+    } else {
+      // 4) Contorno negro: hace que el texto se lea sobre fondo blanco y negro
+      let edge = false;
+      for (let dy = -1; dy <= 1 && !edge; dy++) for (let dx = -1; dx <= 1; dx++) {
+        const nx = x + dx, ny = y + dy;
+        if (nx >= 0 && ny >= 0 && nx < CW && ny < CH && text[ny * CW + nx]) { edge = true; break; }
+      }
+      if (edge) put(i, 0, 0, 0);
+    }
+  }
+  ctx.putImageData(img, 0, 0);
+}
+
+// Mueve cada barra hacia su valor poco a poco y la anima (se llama 24 veces por segundo)
+function stepBars() {
+  for (const b of Object.values(BARS)) {
+    const diff = b.target - b.shown;
+    if (Math.abs(diff) < 0.5) b.shown = b.target;
+    else b.shown += Math.sign(diff) * Math.max(0.5, Math.abs(diff) * 0.15);
+  }
+  redrawBars();
+  drawCredit(performance.now() / 1000);
+}
+redrawBars();
+
+setInterval(() => {
+  const now = Date.now();
+  stepBars();
+  if (problems.length) {
+    // Si hay varios problemas, va alternando las caras cada 3 segundos
+    const f = FACES[problems[Math.floor(now / 3000) % problems.length]];
+    setFace(f.src, f.msg, f.dark);
+    blinkIdx = -1;
+    return;
+  }
+  const msg = last ? 'Estoy feliz!' : 'Esperando datos...';
+  if (blinkIdx < 0 && now >= nextBlink) blinkIdx = 0;
+  if (blinkIdx >= 0) {
+    setFace(BLINK_FRAMES[blinkIdx], msg, BLINK_DARK);
+    blinkIdx++;
+    if (blinkIdx >= BLINK_FRAMES.length) { blinkIdx = -1; nextBlink = now + randBlinkDelay(); }
+  } else {
+    setFace(BLINK_FRAMES[0], msg, BLINK_DARK);
+  }
+}, 1000 / FPS);
+
+// ---------- Pantalla ----------
+function render() {
+  computeProblems();
+  if (!last) { drawChart(); return; }
+  const l = luzPct(last), h = humPct(last);
+
+  $('luzRaw').textContent = last.luz == null ? '--' : Math.round(last.luz);
+  $('humRaw').textContent = last.hum == null ? '--' : Math.round(last.hum);
+  $('luzVal').textContent = (l == null ? '--' : Math.round(l)) + '%';
+  $('humVal').textContent = (h == null ? '--' : Math.round(h)) + '%';
+  BARS.luz.target = l ?? 0;
+  BARS.hum.target = h ?? 0;
+
+  $('lastTime').textContent = new Date(last.t).toLocaleTimeString();
+  $('count').textContent = count;
+  drawChart();
+}
+
+// Gráfica pixelada: el canvas es pequeño (240x80) y se amplía sin suavizar
+function drawChart() {
+  if (!$('settings').classList.contains('open')) return;
+  const c = $('chart'), ctx = c.getContext('2d'), W = c.width, H = c.height;
+  ctx.imageSmoothingEnabled = false;
+  ctx.fillStyle = '#000'; ctx.fillRect(0, 0, W, H);
+
+  ctx.fillStyle = '#333';
+  for (const v of [25, 50, 75]) {
+    const y = Math.round((H - 1) * (1 - v / 100));
+    for (let x = 0; x < W; x += 4) ctx.fillRect(x, y, 2, 1);
+  }
+
+  const winS = Number($('window').value), win = winS * 1000, t0 = Date.now() - win;
+  $('axisFrom').textContent = winS >= 3600 ? `-${winS / 3600} h` : `-${winS / 60} min`;
+
+  const series = [[luzPct, getComputedStyle(document.body).getPropertyValue('--luz')],
+                  [humPct, getComputedStyle(document.body).getPropertyValue('--hum')]];
+  for (const [fn, color] of series) {
+    const sum = new Float64Array(W), n = new Uint16Array(W);
+    for (const d of data) {
+      if (d.t < t0) continue;
+      const v = fn(d); if (v == null) continue;
+      const x = Math.min(W - 1, Math.floor((d.t - t0) / win * W));
+      sum[x] += v; n[x]++;
+    }
+    ctx.fillStyle = color.trim();
+    let prevX = null, prevY = null;
+    for (let x = 0; x < W; x++) {
+      if (!n[x]) continue;
+      const y = Math.round((H - 1) * (1 - sum[x] / n[x] / 100));
+      if (prevX == null || x - prevX > W / 5) {
+        ctx.fillRect(x, y, 1, 1);          // primer punto o hueco largo (sin datos): no se une
+      } else {
+        // une con el punto anterior columna por columna, en escalones
+        let yy = prevY;
+        for (let xi = prevX + 1; xi <= x; xi++) {
+          const yi = Math.round(prevY + (y - prevY) * (xi - prevX) / (x - prevX));
+          ctx.fillRect(xi, Math.min(yi, yy), 1, Math.abs(yi - yy) + 1);
+          yy = yi;
+        }
+      }
+      prevX = x; prevY = y;
+    }
+  }
+}
+$('window').onchange = drawChart;
+setInterval(drawChart, 1000);
+
+$('btnClear').onclick = () => { data.length = 0; for (const k in ema) delete ema[k]; drawChart(); };
+$('btnCsv').onclick = () => {
+  const rows = ['fecha_hora,luz_crudo,luz_pct,humedad_crudo,humedad_pct,temperatura'];
+  for (const d of data) {
+    const f = v => v == null ? '' : (+v).toFixed(1);
+    rows.push([new Date(d.t).toLocaleString().replace(',', ''), f(d.luz), f(luzPct(d)), f(d.hum), f(humPct(d)), f(d.temp)].join(','));
+  }
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([rows.join('\n')], { type: 'text/csv' }));
+  a.download = 'planta_' + new Date().toISOString().slice(0, 16).replace(/[:T]/g, '-') + '.csv';
+  a.click();
+};
+
+// ---------- Conexión USB (Web Serial) ----------
+let port = null, reader = null, keepReading = false, demoTimer = null;
+
+function setStatus(on, text) { $('led').classList.toggle('on', on); $('statusText').textContent = text; }
+
+if (!('serial' in navigator)) {
+  $('noSerial').style.display = 'block'; $('btnConnect').disabled = true; setStatus(false, 'SIN USB');
+}
+
+$('btnConnect').onclick = async () => {
+  if (demoTimer) { stopDemo(); setStatus(false, 'CONECTAR'); return; }
+  if (port) return disconnect();
+  try {
+    port = await navigator.serial.requestPort();
+    await port.open({ baudRate: Number($('baud').value) });
+  } catch (e) {
+    port = null;
+    if (e.name !== 'NotFoundError') alert('No se pudo abrir el puerto: ' + e.message + '\n\n¿Está abierto el Monitor Serie del IDE de Arduino? Ciérralo e inténtalo de nuevo.');
+    return;
+  }
+  setStatus(true, 'USB OK');
+  readLoop();
+};
+
+async function readLoop() {
+  keepReading = true;
+  const decoder = new TextDecoder();
+  let buffer = '';
+  while (port && port.readable && keepReading) {
+    reader = port.readable.getReader();
+    try {
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        let i;
+        while ((i = buffer.indexOf('\n')) >= 0) {
+          handleLine(buffer.slice(0, i).replace('\r', ''));
+          buffer = buffer.slice(i + 1);
+        }
+      }
+    } catch (e) {
+      addLog('[error] ' + e.message);
+    } finally {
+      reader.releaseLock();
+    }
+  }
+  if (keepReading) { // se perdió la conexión (cable desconectado)
+    try { await port.close(); } catch (e) {}
+    port = null;
+    setStatus(false, 'SIN CABLE');
+  }
+}
+
+async function disconnect() {
+  keepReading = false;
+  try { await reader?.cancel(); } catch (e) {}
+  try { await port?.close(); } catch (e) {}
+  port = null;
+  setStatus(false, 'CONECTAR');
+}
+
+// ---------- Modo demo (para probar sin Arduino): recorre todas las caras ----------
+let demoT = 0;
+function stopDemo() { clearInterval(demoTimer); demoTimer = null; $('btnDemo').textContent = 'Modo demo'; }
+$('btnDemo').onclick = () => {
+  if (demoTimer) { stopDemo(); setStatus(false, 'CONECTAR'); return; }
+  if (port) disconnect();
+  setStatus(true, 'DEMO');
+  $('btnDemo').textContent = 'Detener demo';
+  demoTimer = setInterval(() => {
+    demoT++;
+    const luz = Math.round(512 + 511 * Math.sin(demoT / 12) + (Math.random() - .5) * 30);
+    const hum = Math.round(660 + 400 * Math.cos(demoT / 19) + (Math.random() - .5) * 20);
+    handleLine(`luz=${Math.max(0, Math.min(1023, luz))};hum=${Math.max(0, Math.min(1023, hum))}`);
+  }, 1000);
+};
+
+$('saveInfo').textContent = readCookie(STORE) ? 'Configuracion cargada (cookie)' : '';
+render();
+</script>
+</body>
+</html>

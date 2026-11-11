@@ -1,0 +1,2270 @@
+<!DOCTYPE html>
+<html lang="es" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Simulador Walkman ESP32 - Frutiger Aero & Sony Walkman UI (320x240)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background:
+                radial-gradient(circle at 15% 15%, rgba(6, 182, 212, 0.32) 0%, transparent 45%),
+                radial-gradient(circle at 85% 18%, rgba(16, 185, 129, 0.28) 0%, transparent 50%),
+                radial-gradient(circle at 50% 90%, rgba(244, 63, 94, 0.18) 0%, transparent 50%),
+                linear-gradient(160deg, #041322 0%, #09233d 48%, #04101f 100%);
+            color: #f0f9ff;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+        .mono {
+            font-family: 'JetBrains Mono', monospace;
+        }
+        /* Chasis metálico líquido estilo Sony Walkman NW-A / X-Series + Frutiger Aero */
+        .walkman-aero-chassis {
+            background: linear-gradient(150deg, #e0f2fe 0%, #bae6fd 22%, #94a3b8 58%, #334155 100%);
+            box-shadow:
+                0 28px 65px rgba(2, 10, 22, 0.85),
+                0 0 0 1px rgba(255, 255, 255, 0.88),
+                inset 0 3px 8px rgba(255, 255, 255, 0.95),
+                inset 0 -8px 18px rgba(15, 23, 42, 0.45);
+            border: 2px solid #bae6fd;
+            position: relative;
+        }
+        .walkman-aero-chassis::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 4%;
+            right: 4%;
+            height: 32px;
+            background: linear-gradient(180deg, rgba(255,255,255,0.9) 0%, rgba(255,255,255,0) 100%);
+            border-radius: 999px;
+            pointer-events: none;
+        }
+        .aero-glass-card {
+            background: linear-gradient(180deg, rgba(255, 255, 255, 0.16) 0%, rgba(10, 31, 56, 0.76) 100%);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(125, 211, 252, 0.35);
+            box-shadow:
+                0 12px 32px rgba(2, 12, 27, 0.45),
+                inset 0 1px 0 rgba(255, 255, 255, 0.38);
+        }
+        .aqua-pill-btn {
+            background: linear-gradient(180deg, #67e8f9 0%, #0284c7 48%, #0369a1 52%, #38bdf8 100%);
+            box-shadow:
+                0 4px 12px rgba(2, 132, 199, 0.45),
+                inset 0 1px 1px rgba(255, 255, 255, 0.9);
+            border: 1px solid #bae6fd;
+        }
+        .aqua-pill-btn:hover {
+            filter: brightness(1.08);
+        }
+        #ili9341Canvas {
+            image-rendering: pixelated;
+            image-rendering: crisp-edges;
+            cursor: pointer;
+            touch-action: none;
+        }
+        .tft-bezel {
+            background: linear-gradient(180deg, #090d16 0%, #152238 100%);
+            box-shadow:
+                inset 0 3px 12px rgba(0,0,0,0.95),
+                0 2px 0 rgba(255,255,255,0.85);
+            border: 3px solid #1e293b;
+        }
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: rgba(15, 23, 42, 0.6);
+        }
+        ::-webkit-scrollbar-thumb {
+            background: rgba(56, 189, 248, 0.45);
+            border-radius: 3px;
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col items-center justify-start py-4 px-2 sm:px-6">
+
+    <!-- ENCABEZADO SUPERIOR WALKMAN + FRUTIGER AERO -->
+    <header class="w-full max-w-5xl flex flex-wrap items-center justify-between gap-3 mb-4 px-2">
+        <div class="flex items-center gap-3">
+            <!-- Logo estilo Walkman 'W.' en burbuja Frutiger Aero -->
+            <div class="w-11 h-11 rounded-2xl aqua-pill-btn flex items-center justify-center text-white font-black text-xl shadow-lg tracking-tighter">
+                W<span class="text-emerald-300">.</span>
+            </div>
+            <div>
+                <h1 class="text-lg sm:text-xl font-black tracking-tight text-white flex flex-wrap items-center gap-2">
+                    WALKMAN ESP32 <span class="text-xs font-bold px-2.5 py-0.5 rounded-full bg-cyan-400/20 text-cyan-200 border border-cyan-300/40">SONY WALKMAN × FRUTIGER AERO</span>
+                </h1>
+                <p class="text-xs text-sky-200/80">
+                    ILI9341 2.8" (320×240) • Letras `.LRC` ampliadas • Bloqueo inteligente de Spotify sin teléfono • Guardado de Playlists en SD
+                </p>
+            </div>
+        </div>
+
+        <!-- Barra de herramientas: Audio Sintetizador / Archivo Local / Teléfono BT / Prompt -->
+        <div class="flex flex-wrap items-center gap-2 aero-glass-card rounded-2xl p-1.5 px-3">
+            <button id="quickAudioBtn" onclick="togglePlayPause()" class="aqua-pill-btn px-3 py-1.5 rounded-xl text-xs font-bold text-white transition">
+                ▶ REPRODUCIR (148 BPM)
+            </button>
+
+            <!-- Botón para agregar canciones (.FLAC, .MP3, .WAV, .OGG, .LRC) o arrastrarlas -->
+            <label class="px-2.5 py-1.5 rounded-xl text-xs font-bold bg-rose-500/25 hover:bg-rose-500/40 text-rose-200 border border-rose-400/40 cursor-pointer transition flex items-center gap-1">
+                ➕ Añadir .FLAC / Canción
+                <input type="file" id="localAudioInput" multiple accept=".flac,.mp3,.wav,.ogg,.m4a,.aac,.opus,.lrc,audio/*" class="hidden" onchange="loadUserAudioFile(event)">
+            </label>
+
+            <!-- Botón para pegar/importar un archivo .LRC personalizado -->
+            <button onclick="openLrcModal()" class="px-2.5 py-1.5 rounded-xl text-xs font-bold bg-sky-500/20 hover:bg-sky-500/35 text-sky-200 border border-sky-400/30 transition">
+                📄 Importar .LRC
+            </button>
+
+            <button onclick="copyClaudeAeroPrompt()" class="px-3 py-1.5 rounded-xl text-xs font-bold bg-emerald-500/25 hover:bg-emerald-500/40 text-emerald-200 border border-emerald-400/40 transition">
+                📋 Copiar Prompt para Claude
+            </button>
+        </div>
+    </header>
+
+    <!-- ZONA GLOBAL DRAG & DROP PARA ARCHIVOS .FLAC / .MP3 / .WAV / .OGG / .LRC -->
+    <div id="dropOverlay" class="fixed inset-0 bg-sky-950/85 backdrop-blur-md hidden items-center justify-center p-6 z-50 pointer-events-none">
+        <div class="aero-glass-card max-w-md w-full rounded-3xl p-8 border-2 border-dashed border-cyan-300 text-center shadow-2xl">
+            <div class="w-16 h-16 mx-auto mb-3 rounded-2xl aqua-pill-btn flex items-center justify-center text-3xl">
+                💿
+            </div>
+            <h3 class="text-base font-black text-white mb-1">Suelta tus archivos .FLAC, .MP3, .WAV, .OGG o .LRC</h3>
+            <p class="text-xs text-sky-200">
+                Se copiarán automáticamente a la tarjeta MicroSD virtual del Walkman y pasarán por el ecualizador Biquad de 3 bandas.
+            </p>
+        </div>
+    </div>
+
+    <!-- CONTENEDOR PRINCIPAL -->
+    <main class="w-full max-w-5xl grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
+
+        <!-- COLUMNA IZQUIERDA: CHASIS SONY WALKMAN FRUTIGER AERO -->
+        <section class="lg:col-span-8 flex flex-col items-center">
+            <div class="walkman-aero-chassis w-full rounded-[2rem] p-4 sm:p-6">
+
+                <!-- Barra superior de simulación de hardware (Teléfono Bluetooth + Salida de Audio) -->
+                <div class="flex flex-wrap items-center justify-between gap-2 pb-3 mb-3 border-b border-slate-500/30 relative z-10">
+                    <!-- Interruptor de Teléfono Conectado (Requisito para abrir Spotify) -->
+                    <div class="flex items-center gap-2">
+                        <button onclick="togglePhoneConnection()" id="phoneConnBtn" class="flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-600 text-white text-[11px] font-extrabold shadow cursor-pointer transition">
+                            <span id="phoneConnDot" class="w-2 h-2 rounded-full bg-white animate-pulse"></span>
+                            📱 Teléfono BT: CONECTADO
+                        </button>
+                        <span class="hidden sm:inline text-[10px] font-bold text-slate-800 bg-white/70 px-2 py-0.5 rounded-full border border-white">
+                            Desconéctalo para probar el bloqueo de Spotify
+                        </span>
+                    </div>
+
+                    <!-- Indicadores de salida física (Jack 3.5mm PCM5102A vs ESP32#2 Bluetooth) -->
+                    <div class="flex items-center gap-1.5">
+                        <button onclick="toggleOutputMode()" id="hwJackBadge" class="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-sky-700 text-white text-[11px] font-bold shadow cursor-pointer transition">
+                            <span class="w-2 h-2 rounded-full bg-cyan-300"></span>
+                            Jack 3.5mm (PCM5102A)
+                        </button>
+                        <button onclick="toggleOutputMode()" id="hwBtBadge" class="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-slate-200/80 text-slate-700 border border-slate-300 text-[11px] font-bold cursor-pointer transition">
+                            <span class="w-2 h-2 rounded-full bg-slate-400" id="hwBtDot"></span>
+                            ESP32#2 BT Out
+                        </button>
+                    </div>
+                </div>
+
+                <!-- BISEL DE PANTALLA ILI9341 2.8" (320x240 nativo) -->
+                <div class="tft-bezel rounded-2xl p-2.5 sm:p-3.5 relative mx-auto w-full max-w-[680px]">
+                    <div class="flex items-center justify-between text-[10px] text-sky-200/80 mono mb-1.5 px-1">
+                        <span>SONY WALKMAN × FRUTIGER AERO • ILI9341 (320×240 px)</span>
+                        <span id="touchCoordBadge" class="text-cyan-300 font-bold">TOUCH XPT2046: X:--- Y:---</span>
+                    </div>
+
+                    <!-- LIENZO NATIVO DE 320x240 PIXELES -->
+                    <div class="relative w-full aspect-[4/3] rounded-xl overflow-hidden border border-cyan-300/35 shadow-2xl bg-slate-950">
+                        <canvas id="ili9341Canvas" width="320" height="240" class="w-full h-full block"></canvas>
+                    </div>
+
+                    <!-- Pie del bisel con logo Walkman -->
+                    <div class="flex flex-wrap items-center justify-between mt-2 px-1 gap-2">
+                        <div class="flex items-center gap-2">
+                            <span class="text-xs font-black tracking-tight text-white flex items-center gap-1">
+                                <span class="text-cyan-400">W.</span> WALKMAN <span class="text-emerald-300 font-semibold italic">ClearAudio+</span>
+                            </span>
+                            <span class="text-[10px] px-2 py-0.5 rounded-full bg-cyan-500/20 text-cyan-200 border border-cyan-400/30 font-semibold">
+                                💡 Arrastra cualquier archivo .FLAC o .MP3 directo sobre el Walkman
+                            </span>
+                        </div>
+                        <button onclick="toggleGridOverlay()" id="gridBtn" class="text-[10px] text-sky-300 hover:underline mono">
+                            Rejilla XY: OFF
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Accesos rápidos en el chasis inferior -->
+                <div class="mt-4 flex flex-wrap items-center justify-between gap-2 pt-2.5 border-t border-slate-500/30 text-xs">
+                    <div class="flex flex-wrap items-center gap-1.5">
+                        <span class="text-slate-900 font-extrabold text-[11px] mr-1">ACCESO RÁPIDO:</span>
+                        <button onclick="switchScreenMode('PLAYER')" class="px-2.5 py-1 rounded-full bg-white/90 hover:bg-white text-slate-900 border border-sky-300 shadow-sm text-[11px] font-bold transition">
+                            🎵 Reproductor + Letra
+                        </button>
+                        <button onclick="openMenuCategory('SD')" class="px-2.5 py-1 rounded-full bg-white/90 hover:bg-white text-slate-900 border border-sky-300 shadow-sm text-[11px] font-bold transition">
+                            💾 MicroSD
+                        </button>
+                        <button onclick="openMenuCategory('SPOTIFY')" class="px-2.5 py-1 rounded-full bg-emerald-600 hover:bg-emerald-500 text-white shadow-sm text-[11px] font-bold transition">
+                            🟢 Spotify / Guardar Playlist
+                        </button>
+                        <button onclick="switchScreenMode('EQ')" class="px-2.5 py-1 rounded-full bg-white/90 hover:bg-white text-slate-900 border border-sky-300 shadow-sm text-[11px] font-bold transition">
+                            🎛️ Mega Bass EQ
+                        </button>
+                    </div>
+
+                    <div class="flex items-center gap-2 bg-slate-900/80 text-white px-3 py-1 rounded-full border border-sky-300/40 shadow-inner">
+                        <span class="text-[11px] text-cyan-300 font-bold">VOL:</span>
+                        <input id="extVolSlider" type="range" min="0" max="100" value="85" oninput="setMasterVolume(this.value)" class="w-20 accent-cyan-400 cursor-pointer">
+                        <span id="extVolLabel" class="text-xs font-extrabold text-cyan-200 mono w-8 text-right">85%</span>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- COLUMNA DERECHA: ESTADO DE TELEFONO / GUARDADO DE PLAYLISTS SD + DSP + INSPECTOR -->
+        <aside class="lg:col-span-4 flex flex-col gap-4">
+
+            <!-- Tarjeta 1: Estado de Conexión Spotify y Guardado de Playlists en MicroSD -->
+            <div class="aero-glass-card rounded-2xl p-4">
+                <div class="flex items-center justify-between mb-2">
+                    <h2 class="text-xs font-bold uppercase tracking-wider text-emerald-300 flex items-center gap-1.5">
+                        <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
+                        Spotify BT & Guardado en SD
+                    </h2>
+                    <span id="spotifyStatusPill" class="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/25 text-emerald-200 border border-emerald-400/40 font-bold">
+                        TELÉFONO ACTIVO
+                    </span>
+                </div>
+
+                <p class="text-[11px] text-sky-100/90 leading-relaxed mb-2.5">
+                    • Si desconectas el <b>Teléfono BT</b>, el menú de Spotify se bloquea con candado.<br>
+                    • Dentro de <b>MENU → Guardar Playlist</b> puedes elegir qué playlist de Spotify volcar a la MicroSD (en cola para la fase 2 del firmware).
+                </p>
+
+                <div class="bg-slate-950/80 border border-sky-400/25 rounded-xl p-2.5 text-[11px] mono">
+                    <div class="text-cyan-300 font-bold mb-1">📥 Playlists en cola para MicroSD:</div>
+                    <div id="queuedPlaylistsBox" class="text-slate-300 text-[10px] space-y-1">
+                        <div>• Mix Butcher Vanity / SynthV <span class="text-amber-300">[⏳ En pausa v1]</span></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tarjeta 2: Ecualizador Biquad Real (Clear Bass / Voces / Agudos) -->
+            <div class="aero-glass-card rounded-2xl p-4">
+                <div class="flex items-center justify-between mb-2">
+                    <h2 class="text-xs font-bold uppercase tracking-wider text-cyan-300 flex items-center gap-1.5">
+                        <span class="w-2 h-2 rounded-full bg-cyan-400"></span>
+                        Walkman ClearAudio+ DSP (3 Bandas)
+                    </h2>
+                    <span id="dspPresetBadge" class="text-[10px] px-2.5 py-0.5 rounded-full bg-cyan-400/25 text-cyan-200 border border-cyan-300/40 font-bold">
+                        MEGA BASS
+                    </span>
+                </div>
+
+                <div class="space-y-2 mt-2 text-xs mono">
+                    <div>
+                        <div class="flex justify-between text-[11px] mb-0.5">
+                            <span class="text-sky-100">CLEAR BASS (100Hz):</span>
+                            <span id="lblBassDb" class="text-cyan-300 font-bold">+7 dB</span>
+                        </div>
+                        <input id="extBass" type="range" min="-12" max="12" step="1" value="7" oninput="updateEqBand('bass', this.value)" class="w-full accent-cyan-400 cursor-pointer h-1.5 bg-slate-900 rounded-lg">
+                    </div>
+                    <div>
+                        <div class="flex justify-between text-[11px] mb-0.5">
+                            <span class="text-sky-100">VOCAL CLARITY (2.0kHz):</span>
+                            <span id="lblMidDb" class="text-emerald-300 font-bold">+4 dB</span>
+                        </div>
+                        <input id="extMid" type="range" min="-12" max="12" step="1" value="4" oninput="updateEqBand('mid', this.value)" class="w-full accent-emerald-400 cursor-pointer h-1.5 bg-slate-900 rounded-lg">
+                    </div>
+                    <div>
+                        <div class="flex justify-between text-[11px] mb-0.5">
+                            <span class="text-sky-100">TREBLE SHINE (10kHz):</span>
+                            <span id="lblTrebleDb" class="text-sky-300 font-bold">+5 dB</span>
+                        </div>
+                        <input id="extTreble" type="range" min="-12" max="12" step="1" value="5" oninput="updateEqBand('treble', this.value)" class="w-full accent-sky-300 cursor-pointer h-1.5 bg-slate-900 rounded-lg">
+                    </div>
+                </div>
+
+                <div class="mt-3 pt-2.5 border-t border-sky-300/20 grid grid-cols-4 gap-1.5">
+                    <button onclick="applyEqPreset('FLAT')" class="py-1 rounded-lg bg-slate-900/70 hover:bg-slate-800 text-[10px] font-bold text-slate-200 border border-slate-600">Flat</button>
+                    <button onclick="applyEqPreset('MEGABASS')" class="py-1 rounded-lg bg-cyan-500/25 hover:bg-cyan-500/40 text-[10px] font-bold text-cyan-200 border border-cyan-400/40">MegaBass</button>
+                    <button onclick="applyEqPreset('VOCAL')" class="py-1 rounded-lg bg-emerald-500/25 hover:bg-emerald-500/40 text-[10px] font-bold text-emerald-200 border border-emerald-400/40">Vocal+</button>
+                    <button onclick="applyEqPreset('ROCK')" class="py-1 rounded-lg bg-rose-500/25 hover:bg-rose-500/40 text-[10px] font-bold text-rose-200 border border-rose-400/40">SynthV</button>
+                </div>
+            </div>
+
+            <!-- Tarjeta 3: Inspector Touch & Monitor UART Dual-ESP32 -->
+            <div class="aero-glass-card rounded-2xl p-4">
+                <div class="flex items-center justify-between mb-1.5">
+                    <h2 class="text-xs font-bold uppercase tracking-wider text-sky-300">
+                        Inspector Touch + Serial2 Log
+                    </h2>
+                    <span id="inspectorXY" class="text-[11px] font-bold text-cyan-300 mono">X:160, Y:120</span>
+                </div>
+                <div class="text-[10px] text-emerald-300 mono mb-2 truncate" id="inspectorZone">WIDGET: WALKMAN_LYRICS_PANEL</div>
+
+                <div class="bg-slate-950/90 border border-sky-400/25 rounded-xl p-2 mb-2.5 mono text-[10px] text-sky-200 overflow-x-auto">
+                    <pre id="arduinoSnippet" class="leading-relaxed text-emerald-300">// Guardia de acceso a Spotify en ESP32 #1:
+if (!a2dp_sink.is_connected()) {
+  showAeroToast("Conecta un telefono BT");
+  return;
+}</pre>
+                </div>
+
+                <div class="bg-slate-950/85 border border-sky-400/20 rounded-xl p-2">
+                    <div id="uartLogBox" class="h-20 overflow-y-auto mono text-[10px] space-y-1 text-slate-200 pr-1"></div>
+                </div>
+            </div>
+
+        </aside>
+    </main>
+
+    <!-- MODAL PARA IMPORTAR ARCHIVO .LRC COMPLETO -->
+    <div id="lrcModal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-md hidden items-center justify-center p-4 z-50">
+        <div class="aero-glass-card max-w-lg w-full rounded-2xl p-5 border border-cyan-400/50">
+            <div class="flex items-center justify-between mb-2">
+                <h3 class="text-sm font-black text-white">📄 Pegar / Importar Letras Sincronizadas (.LRC)</h3>
+                <button onclick="closeLrcModal()" class="text-slate-400 hover:text-white text-sm font-bold">✕</button>
+            </div>
+            <p class="text-xs text-sky-200/80 mb-3">
+                Pega cualquier archivo <code>.lrc</code> con formato <code>[mm:ss.xx] Línea de letra</code> o <code>m:ss Línea</code> para probar cómo se desplaza en el panel amplio de cristal del Walkman:
+            </p>
+            <textarea id="lrcTextarea" rows="7" class="w-full rounded-xl bg-slate-950/90 border border-sky-400/40 p-3 text-xs mono text-cyan-100 focus:outline-none" placeholder="[00:00.00] Primera línea...&#10;[00:03.50] Segunda línea..."></textarea>
+            <div class="flex justify-end gap-2 mt-3">
+                <button onclick="closeLrcModal()" class="px-3 py-1.5 rounded-xl text-xs font-bold bg-slate-800 text-slate-300">Cancelar</button>
+                <button onclick="applyCustomLrc()" class="aqua-pill-btn px-4 py-1.5 rounded-xl text-xs font-bold text-white">Aplicar al Walkman</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Notificación flotante al copiar el prompt -->
+    <div id="toastNotice" class="fixed bottom-5 right-5 hidden aero-glass-card px-4 py-2.5 rounded-2xl text-xs font-bold text-white shadow-2xl border border-emerald-400/50 z-50">
+        ✅ ¡Prompt Walkman × Frutiger Aero copiado al portapapeles!
+    </div>
+
+    <script>
+        /***********************************************************************
+         * 1. CATÁLOGO DE PISTAS (CON "BUTCHER VANITY" DE VANE LILY FT. YI XI)
+         *    Nota: Incluye las 4 líneas iniciales atribuidas y marcadores
+         *    sincronizados de cada sección de la pista (0:00 a 3:12), además
+         *    del importador .LRC interactivo para cargar archivos .lrc locales.
+         ***********************************************************************/
+        const TRACKS = [
+            {
+                id: 0,
+                filename: "01_Butcher_Vanity.flac",
+                title: "Butcher Vanity",
+                artist: "Vane Lily feat. Yi Xi",
+                album: "SynthV Dark Electropop Single",
+                format: "FLAC",
+                bitrate: "1024 kbps • 24-bit",
+                sourceType: "MICRO SD",
+                duration: 192, // 03:12 exactos
+                tempo: 148,
+                rootNote: 62, // D minor / industrial synth
+                scale: [0, 2, 3, 5, 7, 8, 11, 12],
+                artTop: "#f43f5e",
+                artBottom: "#0284c7",
+                accent: "#00f5d4",
+                lyrics: [
+                    { time: 0,   text: "They say my hunger's a problem" },
+                    { time: 3,   text: "They tell me to curb my appetite" },
+                    { time: 6,   text: "They say I can't keep myself from trying" },
+                    { time: 9,   text: "A bite of every plate in sight" },
+                    { time: 12,  text: "♪ [0:12 • Verso 1: Metáforas de paciencia y deseo] ♪" },
+                    { time: 18,  text: "♪ [0:18 • Pre-Coro: Subida de sintetizador industrial] ♪" },
+                    { time: 25,  text: "♪ [0:25 • Coro Principal: Ritmo 148 BPM enérgico] ♪" },
+                    { time: 34,  text: "♪ [0:34 • Gancho Bilingüe + Línea de Bajo ClearBass] ♪" },
+                    { time: 49,  text: "♪ [0:49 • Verso 2: Arpegios cristalinos y percusión] ♪" },
+                    { time: 61,  text: "♪ [1:01 • Puente Melódico: Contraste vocal SynthV] ♪" },
+                    { time: 73,  text: "♪ [1:13 • Coro 2: Armonías vocales + Sintetizador] ♪" },
+                    { time: 86,  text: "♪ [1:26 • Sección Climática del Coro (2kHz Vocal+)] ♪" },
+                    { time: 100, text: "♪ [1:40 • Puente Rápido: Cadencia rítmica acelerada] ♪" },
+                    { time: 118, text: "♪ [1:58 • Clímax Dinámico y Pausa Dramática] ♪" },
+                    { time: 132, text: "♪ [2:12 • Coro Final: Máxima energía + Sub-Bajos] ♪" },
+                    { time: 157, text: "♪ [2:37 • Cierre Melódico y Sintetizadores Finales] ♪" },
+                    { time: 188, text: "♪ [3:08 • Outro: Desvanecimiento lento hasta 3:12] ♪" }
+                ]
+            },
+            {
+                id: 1,
+                filename: "Spotify_Butcher_Vanity.bt",
+                title: "Butcher Vanity (Spotify)",
+                artist: "Vane Lily feat. Yi Xi",
+                album: "Spotify A2DP Stream • Teléfono BT",
+                format: "SPOTIFY",
+                bitrate: "A2DP 328 kbps AVRCP",
+                sourceType: "SPOTIFY BT",
+                duration: 192,
+                tempo: 148,
+                rootNote: 62,
+                scale: [0, 2, 3, 5, 7, 8, 11, 12],
+                artTop: "#10b981",
+                artBottom: "#0369a1",
+                accent: "#34d399",
+                lyrics: [
+                    { time: 0,  text: "They say my hunger's a problem" },
+                    { time: 3,  text: "They tell me to curb my appetite" },
+                    { time: 6,  text: "They say I can't keep myself from trying" },
+                    { time: 9,  text: "A bite of every plate in sight" },
+                    { time: 12, text: "♪ [Stream Spotify AVRCP Sincronizado en Vivo] ♪" },
+                    { time: 25, text: "♪ [Coro 148 BPM • Procesado por EQ Biquad ESP32#1] ♪" },
+                    { time: 49, text: "♪ [Audio reenviado por I2S a PCM5102A / ESP32#2] ♪" }
+                ]
+            },
+            {
+                id: 2,
+                filename: "02_Aquatic_Horizon.mp3",
+                title: "Aquatic Horizon",
+                artist: "Walkman Aero Ensemble",
+                album: "Crystal Lagoon (2008)",
+                format: "MP3",
+                bitrate: "320 kbps CBR",
+                sourceType: "MICRO SD",
+                duration: 40,
+                tempo: 118,
+                rootNote: 60,
+                scale: [0, 2, 4, 7, 9, 12],
+                artTop: "#38bdf8",
+                artBottom: "#1d4ed8",
+                accent: "#38bdf8",
+                lyrics: [
+                    { time: 0,  text: "♪ [MP3 320kbps desde MicroSD en Bus HSPI] ♪" },
+                    { time: 5,  text: "Brillo cristalino sobre olas de color cian" },
+                    { time: 12, text: "Carretes Walkman girando sin interrupciones" },
+                    { time: 20, text: "Ecualizador ClearBass potenciando los 100 Hz" },
+                    { time: 28, text: "Interfaz limpia con espacio amplio para letras" }
+                ]
+            },
+            {
+                id: 3,
+                filename: "03_Emerald_Glass.ogg",
+                title: "Emerald Glass",
+                artist: "Vorbis Studio DSP",
+                album: "Frutiger Waves",
+                format: "OGG",
+                bitrate: "256 kbps Ogg Vorbis",
+                sourceType: "MICRO SD",
+                duration: 36,
+                tempo: 110,
+                rootNote: 57,
+                scale: [0, 3, 5, 7, 10, 12],
+                artTop: "#2dd4bf",
+                artBottom: "#0f766e",
+                accent: "#5eead4",
+                lyrics: [
+                    { time: 0,  text: "♪ [Decodificador Ogg Vorbis en Tiempo Real] ♪" },
+                    { time: 6,  text: "Voces nítidas realzadas en la banda de 2 kHz" },
+                    { time: 14, text: "Agudos aireados a 10 kHz sin distorsión" },
+                    { time: 22, text: "Conecta por cable 3.5mm o Bluetooth A2DP" }
+                ]
+            },
+            {
+                id: 4,
+                filename: "04_Studio_Master.wav",
+                title: "Crystal Reference",
+                artist: "PCM5102A 24-Bit Test",
+                album: "Lossless Walkman Check",
+                format: "WAV",
+                bitrate: "1411 kbps 16-bit PCM",
+                sourceType: "MICRO SD",
+                duration: 36,
+                tempo: 122,
+                rootNote: 58,
+                scale: [0, 2, 4, 7, 9, 12],
+                artTop: "#818cf8",
+                artBottom: "#4338ca",
+                accent: "#a5b4fc",
+                lyrics: [
+                    { time: 0,  text: "♪ [WAV PCM Sin Compresión • 1411 kbps] ♪" },
+                    { time: 6,  text: "Rango dinámico puro directo al DAC I2S" },
+                    { time: 14, text: "Separación de buses VSPI (TFT) y HSPI (SD)" },
+                    { time: 22, text: "Cero parpadeos en pantalla y cero cortes" }
+                ]
+            }
+        ];
+
+        // Playlists de Spotify que se pueden seleccionar para guardar en la MicroSD (en pausa por ahora)
+        const SPOTIFY_PLAYLISTS = [
+            { id: "pl1", name: "Mix Butcher Vanity / SynthV", tracksCount: 18, queuedForSd: true },
+            { id: "pl2", name: "Ultrakill & Industrial Bass", tracksCount: 24, queuedForSd: false },
+            { id: "pl3", name: "Frutiger Aero Nostalgia 2007", tracksCount: 32, queuedForSd: false },
+            { id: "pl4", name: "Favoritos On-The-Go", tracksCount: 15, queuedForSd: false }
+        ];
+
+        const BT_HEADPHONES = [
+            { name: "Sony WH-1000XM5", mac: "A4:C1:38:9F:12:01" },
+            { name: "AirPods Pro (2nd Gen)", mac: "F0:18:98:3A:77:C4" },
+            { name: "Sennheiser Momentum 4", mac: "00:1B:66:82:E1:55" }
+        ];
+
+        const AERO_BUBBLES = [
+            { x: 42,  y: 68,  r: 15, speed: 6 },
+            { x: 138, y: 155, r: 22, speed: 4 },
+            { x: 258, y: 80,  r: 18, speed: 5 },
+            { x: 292, y: 170, r: 11, speed: 7 }
+        ];
+
+        /***********************************************************************
+         * 2. ESTADO GLOBAL DEL WALKMAN
+         ***********************************************************************/
+        const state = {
+            screenMode: "PLAYER",     // 'PLAYER' | 'MENU' | 'EQ'
+            menuCategory: "SD",       // 'SD' | 'SPOTIFY' | 'SAVE_SD' | 'OUTPUT'
+            sdScrollOffset: 0,        // Desplazamiento de la lista de canciones en la MicroSD
+            lyricsExpanded: false,    // Permite expandir aún más el área de letras en Now Playing
+            phoneConnected: true,     // Si es false, bloquea el acceso a Spotify y Guardar Playlist
+            isPlaying: false,
+            usingUploadedAudio: false,
+            isRecordingStandby: false,
+            currentTrackIdx: 0,
+            trackTime: 0,
+            reelAngle: 0,
+            outputMode: "JACK 3.5",   // 'JACK 3.5' | 'BT OUT'
+            connectedBtDevice: "Sony WH-1000XM5",
+            megaBass: true,
+            presetName: "MEGA BASS",
+            eq: {
+                bass: 7,   // 100 Hz ClearBass
+                mid: 4,    // 2000 Hz Vocal
+                treble: 5  // 10000 Hz Treble
+            },
+            volume: 85,
+            vuL: 0.15,
+            vuR: 0.15,
+            showGrid: false,
+            pressedButton: null,
+            draggingSlider: null,
+            tftToastMsg: null,
+            tftToastTimer: 0
+        };
+
+        /***********************************************************************
+         * 3. MOTOR DE AUDIO DUAL (SINTETIZADOR 148 BPM + ARCHIVO LOCAL + EQ BIQUAD)
+         ***********************************************************************/
+        let audioCtx = null;
+        let bassFilter = null;
+        let midFilter = null;
+        let trebleFilter = null;
+        let masterGain = null;
+        let analyser = null;
+        let synthStep = 0;
+        let synthInterval = null;
+        let htmlAudioElement = null;
+        let mediaElementSource = null;
+
+        function initWebAudio() {
+            if (audioCtx) return;
+            const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+            audioCtx = new AudioContextClass();
+
+            bassFilter = audioCtx.createBiquadFilter();
+            bassFilter.type = "lowshelf";
+            bassFilter.frequency.value = 100;
+
+            midFilter = audioCtx.createBiquadFilter();
+            midFilter.type = "peaking";
+            midFilter.frequency.value = 2000;
+            midFilter.Q.value = 1.0;
+
+            trebleFilter = audioCtx.createBiquadFilter();
+            trebleFilter.type = "highshelf";
+            trebleFilter.frequency.value = 10000;
+
+            masterGain = audioCtx.createGain();
+            analyser = audioCtx.createAnalyser();
+            analyser.fftSize = 64;
+
+            bassFilter.connect(midFilter);
+            midFilter.connect(trebleFilter);
+            trebleFilter.connect(masterGain);
+            masterGain.connect(analyser);
+            analyser.connect(audioCtx.destination);
+
+            syncDspParameters();
+            logUart("DSP_INIT", "Walkman ClearAudio+ Biquad: 100Hz + 2kHz + 10kHz listo");
+        }
+
+        function syncDspParameters() {
+            if (!audioCtx) return;
+            const effectiveBass = state.eq.bass + (state.megaBass ? 4 : 0);
+            bassFilter.gain.setTargetAtTime(effectiveBass, audioCtx.currentTime, 0.03);
+            midFilter.gain.setTargetAtTime(state.eq.mid, audioCtx.currentTime, 0.03);
+            trebleFilter.gain.setTargetAtTime(state.eq.treble, audioCtx.currentTime, 0.03);
+
+            const volNorm = (state.volume / 100) * 0.55;
+            masterGain.gain.setTargetAtTime(volNorm, audioCtx.currentTime, 0.03);
+        }
+
+        function ensureHtmlAudioRouted() {
+            initWebAudio();
+            if (!htmlAudioElement) {
+                htmlAudioElement = new Audio();
+                htmlAudioElement.crossOrigin = "anonymous";
+                mediaElementSource = audioCtx.createMediaElementSource(htmlAudioElement);
+                mediaElementSource.connect(bassFilter);
+
+                htmlAudioElement.addEventListener("timeupdate", () => {
+                    if (state.usingUploadedAudio && state.draggingSlider !== "scrubber") {
+                        state.trackTime = htmlAudioElement.currentTime;
+                    }
+                });
+                htmlAudioElement.addEventListener("loadedmetadata", () => {
+                    if (htmlAudioElement.duration && isFinite(htmlAudioElement.duration)) {
+                        TRACKS[state.currentTrackIdx].duration = Math.max(1, Math.floor(htmlAudioElement.duration));
+                    }
+                });
+                htmlAudioElement.addEventListener("ended", () => {
+                    nextTrack();
+                });
+            }
+        }
+
+        // Extrae Vorbis Comments reales si el usuario arrastra un archivo .FLAC nativo
+        async function parseFlacMetadata(file) {
+            try {
+                const slice = file.slice(0, 65536);
+                const buf = await slice.arrayBuffer();
+                const bytes = new Uint8Array(buf);
+                // Verificar cabecera "fLaC"
+                if (bytes[0] !== 0x66 || bytes[1] !== 0x4C || bytes[2] !== 0x61 || bytes[3] !== 0x43) return null;
+                let offset = 4;
+                const decoder = new TextDecoder("utf-8");
+                while (offset + 4 < bytes.length) {
+                    const isLast = (bytes[offset] & 0x80) !== 0;
+                    const blockType = bytes[offset] & 0x7F;
+                    const blockLen = (bytes[offset + 1] << 16) | (bytes[offset + 2] << 8) | bytes[offset + 3];
+                    offset += 4;
+                    if (blockType === 4 && offset + blockLen <= bytes.length) { // VORBIS_COMMENT
+                        const view = new DataView(buf, offset, blockLen);
+                        let p = 0;
+                        const vendorLen = view.getUint32(p, true);
+                        p += 4 + vendorLen;
+                        const listLen = view.getUint32(p, true);
+                        p += 4;
+                        const meta = {};
+                        for (let i = 0; i < listLen && p + 4 <= blockLen; i++) {
+                            const cLen = view.getUint32(p, true);
+                            p += 4;
+                            if (p + cLen > blockLen) break;
+                            const str = decoder.decode(new Uint8Array(buf, offset + p, cLen));
+                            p += cLen;
+                            const eqIdx = str.indexOf("=");
+                            if (eqIdx > 0) {
+                                const k = str.substring(0, eqIdx).toUpperCase();
+                                const v = str.substring(eqIdx + 1);
+                                meta[k] = v;
+                            }
+                        }
+                        return meta;
+                    }
+                    offset += blockLen;
+                    if (isLast) break;
+                }
+            } catch (e) {
+                return null;
+            }
+            return null;
+        }
+
+        // Procesa archivos subidos por el botón o arrastrados (.FLAC, .MP3, .WAV, .OGG, .LRC)
+        async function processIncomingFiles(fileList) {
+            if (!fileList || fileList.length === 0) return;
+            ensureHtmlAudioRouted();
+            if (audioCtx.state === "suspended") await audioCtx.resume();
+
+            let lastAddedTrackIdx = -1;
+
+            for (const file of Array.from(fileList)) {
+                const extMatch = file.name.match(/\.([^.]+)$/);
+                const ext = extMatch ? extMatch[1].toUpperCase() : "";
+
+                // Si arrastra un archivo de letras .LRC, asociarlo a la canción actual
+                if (ext === "LRC") {
+                    const text = await file.text();
+                    document.getElementById("lrcTextarea").value = text;
+                    applyCustomLrc();
+                    continue;
+                }
+
+                // Determinar formato (FLAC, MP3, WAV, OGG, M4A)
+                const validAudioExts = ["FLAC", "MP3", "WAV", "OGG", "M4A", "AAC", "OPUS"];
+                if (!validAudioExts.includes(ext) && !file.type.startsWith("audio/")) {
+                    showTftToast(`⚠️ Formato .${ext} no soportado`);
+                    continue;
+                }
+
+                const baseName = file.name.replace(/\.[^/.]+$/, "");
+                let artist = "MicroSD Local";
+                let title = baseName;
+                let album = `Archivo ${ext || "AUDIO"} Local`;
+
+                // Separar "Artista - Título" si viene en el nombre del archivo
+                if (baseName.includes(" - ")) {
+                    const parts = baseName.split(" - ");
+                    artist = parts[0].trim();
+                    title = parts.slice(1).join(" - ").trim();
+                }
+
+                // Si es .FLAC, intentar leer etiquetas Vorbis reales embebidas
+                if (ext === "FLAC") {
+                    const flacTags = await parseFlacMetadata(file);
+                    if (flacTags) {
+                        if (flacTags.TITLE) title = flacTags.TITLE;
+                        if (flacTags.ARTIST) artist = flacTags.ARTIST;
+                        if (flacTags.ALBUM) album = flacTags.ALBUM;
+                    }
+                }
+
+                const fileUrl = URL.createObjectURL(file);
+                const isButcherVanity = baseName.toLowerCase().includes("butcher") || title.toLowerCase().includes("butcher");
+
+                // Si agregó Butcher Vanity.flac, reutilizar las letras sincronizadas de Butcher Vanity
+                const defaultLyrics = isButcherVanity
+                    ? [...TRACKS[0].lyrics]
+                    : [
+                        { time: 0,  text: `♪ Reproduciendo ${title} (${ext || "AUDIO"}) ♪` },
+                        { time: 4,  text: `Artista: ${artist}` },
+                        { time: 8,  text: "Procesando en vivo por EQ Biquad 3 Bandas" },
+                        { time: 14, text: "Arrastra un archivo .LRC para sincronizar letras" }
+                    ];
+
+                const palette = [
+                    { top: "#f43f5e", bot: "#0284c7" },
+                    { top: "#06b6d4", bot: "#1d4ed8" },
+                    { top: "#10b981", bot: "#047857" },
+                    { top: "#a855f7", bot: "#4338ca" }
+                ][TRACKS.length % 4];
+
+                const newTrack = {
+                    id: TRACKS.length,
+                    filename: file.name,
+                    title: title,
+                    artist: artist,
+                    album: album,
+                    format: ext || "FLAC",
+                    bitrate: `${Math.round((file.size * 8) / 192000)} kbps • Local`,
+                    sourceType: "MICRO SD",
+                    duration: 192,
+                    tempo: 148,
+                    rootNote: 62,
+                    scale: [0, 2, 3, 5, 7, 8, 11, 12],
+                    artTop: palette.top,
+                    artBottom: palette.bot,
+                    accent: "#00f5d4",
+                    fileUrl: fileUrl,
+                    lyrics: defaultLyrics
+                };
+
+                // Si subió el archivo real de Butcher Vanity, actualizar también la pista 0 o añadirla a la lista SD
+                if (isButcherVanity && !TRACKS[0].fileUrl) {
+                    TRACKS[0].fileUrl = fileUrl;
+                    TRACKS[0].filename = file.name;
+                    TRACKS[0].title = title;
+                    TRACKS[0].artist = artist;
+                    lastAddedTrackIdx = 0;
+                } else {
+                    TRACKS.push(newTrack);
+                    lastAddedTrackIdx = TRACKS.length - 1;
+                }
+
+                logUart("SD_ADD", `Añadida a MicroSD: "${title}" - ${artist} [${ext}]`);
+            }
+
+            if (lastAddedTrackIdx >= 0) {
+                selectTrack(lastAddedTrackIdx);
+                state.screenMode = "PLAYER";
+                showTftToast(`✅ Añadida: ${TRACKS[lastAddedTrackIdx].title.substring(0, 22)}`);
+            }
+        }
+
+        function loadUserAudioFile(event) {
+            processIncomingFiles(event.target.files);
+            event.target.value = ""; // Permitir volver a seleccionar el mismo archivo
+        }
+
+        function syncDspParameters() {
+            if (!audioCtx) return;
+            const effectiveBass = state.eq.bass + (state.megaBass ? 4 : 0);
+            bassFilter.gain.setTargetAtTime(effectiveBass, audioCtx.currentTime, 0.03);
+            midFilter.gain.setTargetAtTime(state.eq.mid, audioCtx.currentTime, 0.03);
+            trebleFilter.gain.setTargetAtTime(state.eq.treble, audioCtx.currentTime, 0.03);
+
+            const volNorm = (state.volume / 100) * 0.55;
+            masterGain.gain.setTargetAtTime(volNorm, audioCtx.currentTime, 0.03);
+        }
+
+        // Permite al usuario cargar el archivo de audio real desde su PC/celular
+        function loadUserAudioFile(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            initWebAudio();
+            if (audioCtx.state === "suspended") audioCtx.resume();
+
+            if (!htmlAudioElement) {
+                htmlAudioElement = new Audio();
+                htmlAudioElement.crossOrigin = "anonymous";
+                mediaElementSource = audioCtx.createMediaElementSource(htmlAudioElement);
+                mediaElementSource.connect(bassFilter);
+
+                htmlAudioElement.addEventListener("timeupdate", () => {
+                    if (state.usingUploadedAudio && state.draggingSlider !== "scrubber") {
+                        state.trackTime = htmlAudioElement.currentTime;
+                    }
+                });
+                htmlAudioElement.addEventListener("loadedmetadata", () => {
+                    if (htmlAudioElement.duration && isFinite(htmlAudioElement.duration)) {
+                        TRACKS[state.currentTrackIdx].duration = Math.floor(htmlAudioElement.duration);
+                    }
+                });
+                htmlAudioElement.addEventListener("ended", () => {
+                    state.isPlaying = false;
+                    updatePlayButtonLabel();
+                });
+            }
+
+            const fileUrl = URL.createObjectURL(file);
+            htmlAudioElement.src = fileUrl;
+            state.usingUploadedAudio = true;
+            if (synthInterval) clearInterval(synthInterval);
+
+            TRACKS[0].title = file.name.replace(/\.[^/.]+$/, "");
+            state.currentTrackIdx = 0;
+            state.trackTime = 0;
+            state.isPlaying = true;
+            htmlAudioElement.play();
+            updatePlayButtonLabel();
+            showTftToast("Audio local cargado en DSP Biquad");
+            logUart("FILE_IN", `Reproduciendo archivo local: ${file.name} con EQ de 3 bandas`);
+        }
+
+        function midiToFreq(midi) {
+            return 440 * Math.pow(2, (midi - 69) / 12);
+        }
+
+        // Sintetizador industrial/electropop a 148 BPM inspirado en Butcher Vanity
+        function triggerSynthStep() {
+            if (!state.isPlaying || state.usingUploadedAudio || !audioCtx) return;
+            if (audioCtx.state === "suspended") audioCtx.resume();
+
+            const track = TRACKS[state.currentTrackIdx];
+            const now = audioCtx.currentTime;
+            const step = synthStep % 16;
+
+            // 1. Bombo punchy a 148 BPM (potenciado por ClearBass 100Hz)
+            if (step === 0 || step === 4 || step === 8 || step === 12 || step === 14) {
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                osc.type = "sine";
+                osc.frequency.setValueAtTime(135, now);
+                osc.frequency.exponentialRampToValueAtTime(44, now + 0.12);
+                gain.gain.setValueAtTime(0.8, now);
+                gain.gain.exponentialRampToValueAtTime(0.001, now + 0.16);
+                osc.connect(gain);
+                gain.connect(bassFilter);
+                osc.start(now);
+                osc.stop(now + 0.17);
+            }
+
+            // 2. Snare / Clap electrónico nítido en pasos 4 y 12
+            if (step === 4 || step === 12) {
+                const bufLen = Math.floor(audioCtx.sampleRate * 0.06);
+                const buffer = audioCtx.createBuffer(1, bufLen, audioCtx.sampleRate);
+                const data = buffer.getChannelData(0);
+                for (let i = 0; i < bufLen; i++) data[i] = (Math.random() * 2 - 1) * Math.exp(-i / (bufLen * 0.4));
+                const noise = audioCtx.createBufferSource();
+                noise.buffer = buffer;
+                const bp = audioCtx.createBiquadFilter();
+                bp.type = "bandpass";
+                bp.frequency.value = 2200;
+                const g = audioCtx.createGain();
+                g.gain.setValueAtTime(0.28, now);
+                g.gain.exponentialRampToValueAtTime(0.001, now + 0.06);
+                noise.connect(bp);
+                bp.connect(g);
+                g.connect(bassFilter);
+                noise.start(now);
+            }
+
+            // 3. Bajo Synth Saw/Triangle con octavas rápidas
+            const bassPattern = [0, 0, 12, 0, 3, 3, 15, 2, 5, 5, 17, 5, 7, 8, 7, 3];
+            const bassMidi = track.rootNote - 12 + (bassPattern[step] % 12);
+            const bOsc = audioCtx.createOscillator();
+            const bGain = audioCtx.createGain();
+            bOsc.type = "sawtooth";
+            bOsc.frequency.setValueAtTime(midiToFreq(bassMidi), now);
+            bGain.gain.setValueAtTime(0.18, now);
+            bGain.gain.exponentialRampToValueAtTime(0.005, now + 0.11);
+            bOsc.connect(bGain);
+            bGain.connect(bassFilter);
+            bOsc.start(now);
+            bOsc.stop(now + 0.12);
+
+            // 4. Melodía SynthV / Lead (Rango vocal 2kHz y brillo 10kHz)
+            const leadPattern = [0, 3, 7, 8, 7, 5, 3, 2, 0, 7, 12, 11, 8, 7, 5, 3];
+            if (step % 2 === 0 || step === 3 || step === 11 || step === 15) {
+                const leadMidi = track.rootNote + 12 + leadPattern[step];
+                const lOsc = audioCtx.createOscillator();
+                const lGain = audioCtx.createGain();
+                lOsc.type = "triangle";
+                lOsc.frequency.setValueAtTime(midiToFreq(leadMidi), now);
+                lGain.gain.setValueAtTime(0.22, now);
+                lGain.gain.exponentialRampToValueAtTime(0.004, now + 0.16);
+                lOsc.connect(lGain);
+                lGain.connect(bassFilter);
+                lOsc.start(now);
+                lOsc.stop(now + 0.17);
+            }
+
+            synthStep++;
+        }
+
+        function playWalkmanClick(freq = 1220) {
+            initWebAudio();
+            if (!audioCtx) return;
+            if (audioCtx.state === "suspended") audioCtx.resume();
+            const now = audioCtx.currentTime;
+            const osc = audioCtx.createOscillator();
+            const g = audioCtx.createGain();
+            osc.type = "sine";
+            osc.frequency.setValueAtTime(freq, now);
+            osc.frequency.exponentialRampToValueAtTime(360, now + 0.014);
+            g.gain.setValueAtTime(0.09, now);
+            g.gain.exponentialRampToValueAtTime(0.001, now + 0.015);
+            osc.connect(g);
+            g.connect(audioCtx.destination);
+            osc.start(now);
+            osc.stop(now + 0.016);
+        }
+
+        function restartSequencerTimer() {
+            if (synthInterval) clearInterval(synthInterval);
+            if (!state.isPlaying || state.usingUploadedAudio) return;
+            const track = TRACKS[state.currentTrackIdx];
+            const stepMs = (60 / track.tempo / 4) * 1000;
+            synthInterval = setInterval(triggerSynthStep, stepMs);
+        }
+
+        function updatePlayButtonLabel() {
+            const btn = document.getElementById("quickAudioBtn");
+            if (!btn) return;
+            btn.textContent = state.isPlaying
+                ? (state.usingUploadedAudio ? "⏸ PAUSAR AUDIO LOCAL" : "⏸ PAUSAR WALKMAN")
+                : (state.usingUploadedAudio ? "▶ REANUDAR AUDIO LOCAL" : "▶ REPRODUCIR (148 BPM)");
+        }
+
+        /***********************************************************************
+         * 4. CONTROL DE TELÉFONO BLUETOOTH, BLOQUEO DE SPOTIFY Y GUARDADO EN SD
+         ***********************************************************************/
+        function showTftToast(msg) {
+            state.tftToastMsg = msg;
+            state.tftToastTimer = 3.2; // segundos visibles en la pantalla de 320x240
+        }
+
+        function togglePhoneConnection() {
+            playWalkmanClick(state.phoneConnected ? 680 : 1420);
+            state.phoneConnected = !state.phoneConnected;
+
+            const btn = document.getElementById("phoneConnBtn");
+            const dot = document.getElementById("phoneConnDot");
+            const pill = document.getElementById("spotifyStatusPill");
+
+            if (state.phoneConnected) {
+                btn.className = "flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-600 text-white text-[11px] font-extrabold shadow cursor-pointer transition";
+                btn.innerHTML = `<span class="w-2 h-2 rounded-full bg-white animate-pulse"></span> 📱 Teléfono BT: CONECTADO`;
+                pill.textContent = "TELÉFONO ACTIVO";
+                pill.className = "text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/25 text-emerald-200 border border-emerald-400/40 font-bold";
+                showTftToast("📱 Smartphone vinculado por A2DP • Spotify desbloqueado");
+                logUart("A2DP_SINK", "Smartphone conectado -> Menú Spotify y Playlists habilitados");
+            } else {
+                btn.className = "flex items-center gap-1.5 px-3 py-1 rounded-full bg-rose-600 text-white text-[11px] font-extrabold shadow cursor-pointer transition";
+                btn.innerHTML = `<span class="w-2 h-2 rounded-full bg-rose-200"></span> 📵 Teléfono BT: DESCONECTADO`;
+                pill.textContent = "SIN TELÉFONO (BLOQUEADO)";
+                pill.className = "text-[10px] px-2 py-0.5 rounded-full bg-rose-500/25 text-rose-200 border border-rose-400/40 font-bold";
+
+                // Si estaba viendo Spotify o reproduciendo desde Spotify, regresar a MicroSD
+                if (state.menuCategory === "SPOTIFY" || state.menuCategory === "SAVE_SD") {
+                    state.menuCategory = "SD";
+                }
+                if (TRACKS[state.currentTrackIdx].sourceType === "SPOTIFY BT") {
+                    state.currentTrackIdx = 0; // Pasa a Butcher Vanity local en MicroSD
+                }
+                showTftToast("🔒 Teléfono desconectado • Spotify bloqueado");
+                logUart("A2DP_SINK", "Smartphone desconectado -> Bloqueando menú Spotify");
+            }
+        }
+
+        function openMenuCategory(cat) {
+            if ((cat === "SPOTIFY" || cat === "SAVE_SD") && !state.phoneConnected) {
+                playWalkmanClick(520);
+                state.screenMode = "MENU";
+                state.menuCategory = "SD";
+                showTftToast("🔒 Conecta un Teléfono BT para abrir Spotify");
+                logUart("UI_GUARD", "Acceso denegado a Spotify: No hay teléfono conectado por Bluetooth");
+                return;
+            }
+            playWalkmanClick(1250);
+            state.screenMode = "MENU";
+            state.menuCategory = cat;
+        }
+
+        function toggleQueuePlaylistForSd(index) {
+            if (!state.phoneConnected) {
+                showTftToast("🔒 Conecta un Teléfono BT primero");
+                return;
+            }
+            playWalkmanClick(1340);
+            const pl = SPOTIFY_PLAYLISTS[index];
+            pl.queuedForSd = !pl.queuedForSd;
+            renderQueuedPlaylistsSidebar();
+            showTftToast(pl.queuedForSd
+                ? `💾 "${pl.name.substring(0, 18)}" en cola SD (Pausado v1)`
+                : `Quitada de la cola MicroSD`);
+            logUart("SD_QUEUE", `Playlist "${pl.name}" -> queuedForSd=${pl.queuedForSd} (Grabación desactivada por ahora)`);
+        }
+
+        function renderQueuedPlaylistsSidebar() {
+            const box = document.getElementById("queuedPlaylistsBox");
+            if (!box) return;
+            const queued = SPOTIFY_PLAYLISTS.filter(p => p.queuedForSd);
+            if (queued.length === 0) {
+                box.innerHTML = `<div class="text-slate-400">Ninguna playlist seleccionada aún.</div>`;
+                return;
+            }
+            box.innerHTML = queued.map(p =>
+                `<div>• ${p.name} <span class="text-amber-300">[⏳ En pausa v1]</span></div>`
+            ).join("");
+        }
+
+        /***********************************************************************
+         * 5. CONTROLES DE REPRODUCCIÓN, IMPORTADOR .LRC Y ECUALIZADOR
+         ***********************************************************************/
+        function togglePlayPause() {
+            initWebAudio();
+            state.isPlaying = !state.isPlaying;
+            playWalkmanClick(state.isPlaying ? 1360 : 860);
+
+            if (state.usingUploadedAudio && htmlAudioElement) {
+                if (state.isPlaying) htmlAudioElement.play();
+                else htmlAudioElement.pause();
+            } else {
+                if (state.isPlaying) restartSequencerTimer();
+                else if (synthInterval) clearInterval(synthInterval);
+            }
+            updatePlayButtonLabel();
+        }
+
+        function selectTrack(index) {
+            const target = TRACKS[(index + TRACKS.length) % TRACKS.length];
+            if (target.sourceType === "SPOTIFY BT" && !state.phoneConnected) {
+                playWalkmanClick(520);
+                showTftToast("🔒 Conecta tu Teléfono BT para reproducir Spotify");
+                return;
+            }
+
+            state.currentTrackIdx = (index + TRACKS.length) % TRACKS.length;
+            state.trackTime = 0;
+            playWalkmanClick(1280);
+
+            // Si la pista tiene un archivo real (.FLAC / .MP3 / .WAV / .OGG) subido o arrastrado
+            if (target.fileUrl) {
+                ensureHtmlAudioRouted();
+                if (synthInterval) clearInterval(synthInterval);
+                state.usingUploadedAudio = true;
+                htmlAudioElement.src = target.fileUrl;
+                state.isPlaying = true;
+                htmlAudioElement.play().catch(() => {});
+                updatePlayButtonLabel();
+            } else {
+                state.usingUploadedAudio = false;
+                if (htmlAudioElement) htmlAudioElement.pause();
+                if (state.isPlaying) restartSequencerTimer();
+                else togglePlayPause();
+            }
+
+            logUart("PLAYER", `Cargada pista: ${target.title} [${target.format}]`);
+        }
+
+        function nextTrack() {
+            let nextIdx = (state.currentTrackIdx + 1) % TRACKS.length;
+            if (!state.phoneConnected && TRACKS[nextIdx].sourceType === "SPOTIFY BT") {
+                nextIdx = (nextIdx + 1) % TRACKS.length;
+            }
+            selectTrack(nextIdx);
+        }
+
+        function prevTrack() {
+            if (state.trackTime > 4) {
+                state.trackTime = 0;
+                if (state.usingUploadedAudio && htmlAudioElement) htmlAudioElement.currentTime = 0;
+                playWalkmanClick(980);
+            } else {
+                let prevIdx = (state.currentTrackIdx - 1 + TRACKS.length) % TRACKS.length;
+                if (!state.phoneConnected && TRACKS[prevIdx].sourceType === "SPOTIFY BT") {
+                    prevIdx = (prevIdx - 1 + TRACKS.length) % TRACKS.length;
+                }
+                selectTrack(prevIdx);
+            }
+        }
+
+        function switchScreenMode(mode) {
+            playWalkmanClick(1180);
+            state.screenMode = mode;
+        }
+
+        function toggleOutputMode() {
+            playWalkmanClick(1280);
+            state.outputMode = (state.outputMode === "JACK 3.5") ? "BT OUT" : "JACK 3.5";
+            updateHardwareBadges();
+            showTftToast(state.outputMode === "BT OUT"
+                ? `📡 Audio I2S → ESP32#2 (${state.connectedBtDevice})`
+                : `🎧 Audio I2S → DAC PCM5102A Jack 3.5mm`);
+        }
+
+        function updateEqBand(band, val) {
+            initWebAudio();
+            state.eq[band] = Math.max(-12, Math.min(12, parseInt(val, 10)));
+            state.presetName = "CUSTOM";
+            syncDspParameters();
+            updateDspSidePanel();
+        }
+
+        function applyEqPreset(preset) {
+            initWebAudio();
+            playWalkmanClick(1320);
+            if (preset === "FLAT") {
+                state.eq.bass = 0; state.eq.mid = 0; state.eq.treble = 0;
+                state.megaBass = false; state.presetName = "FLAT";
+            } else if (preset === "MEGABASS") {
+                state.eq.bass = 8; state.eq.mid = 3; state.eq.treble = 4;
+                state.megaBass = true; state.presetName = "MEGA BASS";
+            } else if (preset === "VOCAL") {
+                state.eq.bass = 2; state.eq.mid = 8; state.eq.treble = 4;
+                state.megaBass = false; state.presetName = "VOCAL+";
+            } else if (preset === "ROCK") {
+                state.eq.bass = 7; state.eq.mid = 5; state.eq.treble = 7;
+                state.megaBass = true; state.presetName = "SYNTHV";
+            }
+            syncDspParameters();
+            updateDspSidePanel();
+        }
+
+        function setMasterVolume(val) {
+            initWebAudio();
+            state.volume = Math.max(0, Math.min(100, parseInt(val, 10)));
+            document.getElementById("extVolSlider").value = state.volume;
+            document.getElementById("extVolLabel").textContent = state.volume + "%";
+            syncDspParameters();
+        }
+
+        function updateDspSidePanel() {
+            const fmt = (n) => (n > 0 ? `+${n} dB` : `${n} dB`);
+            document.getElementById("lblBassDb").textContent = fmt(state.eq.bass);
+            document.getElementById("lblMidDb").textContent = fmt(state.eq.mid);
+            document.getElementById("lblTrebleDb").textContent = fmt(state.eq.treble);
+            document.getElementById("extBass").value = state.eq.bass;
+            document.getElementById("extMid").value = state.eq.mid;
+            document.getElementById("extTreble").value = state.eq.treble;
+            document.getElementById("dspPresetBadge").textContent = state.presetName;
+        }
+
+        function updateHardwareBadges() {
+            const jack = document.getElementById("hwJackBadge");
+            const bt = document.getElementById("hwBtBadge");
+            if (state.outputMode === "JACK 3.5") {
+                jack.className = "flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-sky-700 text-white text-[11px] font-bold shadow cursor-pointer transition";
+                bt.className = "flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-slate-200/80 text-slate-700 border border-slate-300 text-[11px] font-bold cursor-pointer transition";
+            } else {
+                jack.className = "flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-slate-200/80 text-slate-700 border border-slate-300 text-[11px] font-bold cursor-pointer transition";
+                bt.className = "flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-cyan-600 text-white text-[11px] font-bold shadow cursor-pointer transition";
+            }
+        }
+
+        function openLrcModal() {
+            document.getElementById("lrcModal").classList.remove("hidden");
+            document.getElementById("lrcModal").classList.add("flex");
+        }
+
+        function closeLrcModal() {
+            document.getElementById("lrcModal").classList.add("hidden");
+            document.getElementById("lrcModal").classList.remove("flex");
+        }
+
+        function applyCustomLrc() {
+            const raw = document.getElementById("lrcTextarea").value.trim();
+            if (!raw) { closeLrcModal(); return; }
+            const lines = raw.split(/\r?\n/);
+            const parsed = [];
+            lines.forEach(line => {
+                const m = line.match(/\[?(\d{1,2}):(\d{2})(?:\.(\d{1,2}))?\]?\s*(.+)/);
+                if (m) {
+                    const sec = parseInt(m[1], 10) * 60 + parseInt(m[2], 10);
+                    parsed.push({ time: sec, text: m[4].trim() });
+                }
+            });
+            if (parsed.length > 0) {
+                parsed.sort((a, b) => a.time - b.time);
+                TRACKS[state.currentTrackIdx].lyrics = parsed;
+                showTftToast(`✅ ${parsed.length} líneas .LRC sincronizadas`);
+                logUart("LRC_PARSER", `Cargadas ${parsed.length} líneas .LRC en pista activa`);
+            }
+            closeLrcModal();
+        }
+
+        function toggleGridOverlay() {
+            state.showGrid = !state.showGrid;
+            document.getElementById("gridBtn").textContent = `Rejilla XY: ${state.showGrid ? "ON" : "OFF"}`;
+        }
+
+        function logUart(tag, msg) {
+            const box = document.getElementById("uartLogBox");
+            if (!box) return;
+            const ts = new Date().toTimeString().split(" ")[0];
+            const row = document.createElement("div");
+            row.innerHTML = `<span class="text-slate-500">[${ts}]</span> <span class="text-cyan-300 font-bold">${tag}:</span> ${msg}`;
+            box.appendChild(row);
+            box.scrollTop = box.scrollHeight;
+        }
+
+        function copyClaudeAeroPrompt() {
+            const promptText = [
+                'Actúa como un Ingeniero de Sistemas Embebidos y Desarrollador Senior en C++/Arduino especializado en audio digital (I2S, DSP, Bluetooth A2DP) e interfaces gráficas en ESP32.',
+                '',
+                'Quiero desarrollar el firmware completo y el esquema de conexiones para un reproductor portátil estilo "Walkman" en Arduino IDE, utilizando DOS microcontroladores ESP32 Clásicos (ESP32-WROOM-32) con pantalla táctil ILI9341 de 2.8" (320x240) y un diseño visual que fusione SONY WALKMAN (logo W., carretes de cristal, ClearAudio+ / Mega Bass) con la estética FRUTIGER AERO (paneles de cristal esmerilado, cápsulas de gel Aqua, reflejos especulares blancos y burbujas flotantes).',
+                '',
+                '1. REGLAS CLAVE DE FUNCIONALIDAD:',
+                '- Acceso condicional a Spotify: La opción de entrar al menú de Spotify (A2DP Sink + AVRCP) SOLO debe desbloquearse cuando un teléfono esté conectado por Bluetooth ("a2dp_sink.is_connected()"). Si no hay teléfono conectado, debe mostrarse con icono de candado y al tocarla lanzar un aviso flotante indicando que se conecte un smartphone primero.',
+                '- Guardado de Playlists de Spotify en la MicroSD (Preparado pero desactivado por ahora): Dentro del menú de Spotify incluye una sección "Guardar Playlist en MicroSD" donde el usuario pueda seleccionar playlists/canciones para ponerlas en cola de grabación hacia la tarjeta MicroSD (usando una arquitectura AudioTee + corte de archivo WAV por evento AVRCP Track Change, mantenida en pausa mediante una bandera en esta primera versión).',
+                '- Reproductor MicroSD Multi-formato en bus HSPI dedicado: Soporta MP3, WAV, FLAC y OGG + lectura de metadatos y letras sincronizadas (.LRC).',
+                '- Más espacio para la letra (.LRC) y botones pequeños:',
+                '  * La barra inferior de botones táctiles debe ser compacta (solo 24px de alto, Y:214..238) con píldoras de cristal pequeñas ("|<<", "Play/Pause", ">>|", "EQ", "SaveSD", "MENU").',
+                '  * El panel de letras .LRC de cristal esmerilado debe ser grande y cómodo (mostrando 4 líneas simultáneas con la línea actual resaltada en una cápsula luminosa Aqua y un botón "[Expandir]" para ver la letra a ancho completo).',
+                '  * A la izquierda de la letra (en vista normal), incluye una tarjeta Walkman Frutiger Aero con carátula y dos mini-carretes de cristal que giran suavemente + vúmetros L/R.',
+                '- Salida Dual I2S + DSP Biquad de 3 Bandas:',
+                '  * Todo el audio pasa por 3 filtros Biquad IIR en tiempo real: CLEAR BASS (100Hz Low-Shelf), VOCAL CLARITY (2kHz Peaking) y TREBLE SHINE (10kHz High-Shelf).',
+                '  * El audio ecualizado sale por I2S Master hacia el DAC PCM5102A (Jack 3.5mm) y en paralelo hacia el ESP32 #2 (I2S Slave RX + A2DP Source) controlado por UART (Serial2) para conectar audífonos Bluetooth.',
+                '',
+                'Entrégame primero: 1) Tabla de Pinout completa (VSPI para ILI9341+Touch, HSPI para MicroSD, I2S y UART), 2) Arquitectura Dual-Core FreeRTOS, 3) Código completo del ESP32 #2, y 4) Estructura modular del ESP32 #1.'
+            ].join('\n');
+
+            const temp = document.createElement("textarea");
+            temp.value = promptText;
+            document.body.appendChild(temp);
+            temp.select();
+            document.execCommand("copy");
+            document.body.removeChild(temp);
+
+            const toast = document.getElementById("toastNotice");
+            toast.classList.remove("hidden");
+            setTimeout(() => toast.classList.add("hidden"), 3200);
+        }
+
+        /***********************************************************************
+         * 6. RENDERIZADOR GRÁFICO SONY WALKMAN × FRUTIGER AERO EN 320x240
+         ***********************************************************************/
+        const canvas = document.getElementById("ili9341Canvas");
+        const ctx = canvas.getContext("2d");
+
+        function drawAeroGelPill(x, y, w, h, r, topColor, bottomColor, borderColor = "rgba(255,255,255,0.68)", isActive = false) {
+            ctx.save();
+            const grad = ctx.createLinearGradient(x, y, x, y + h);
+            grad.addColorStop(0, topColor);
+            grad.addColorStop(0.52, bottomColor);
+            grad.addColorStop(1, topColor);
+
+            ctx.beginPath();
+            ctx.roundRect(x, y, w, h, r);
+            ctx.fillStyle = grad;
+            ctx.fill();
+
+            // Reflejo especular blanco superior característico de Frutiger Aero
+            const shineGrad = ctx.createLinearGradient(x, y + 1, x, y + h * 0.5);
+            shineGrad.addColorStop(0, "rgba(255, 255, 255, 0.78)");
+            shineGrad.addColorStop(1, "rgba(255, 255, 255, 0.06)");
+
+            ctx.beginPath();
+            ctx.roundRect(x + 1.5, y + 1, Math.max(2, w - 3), Math.max(2, h * 0.46), Math.max(1, r - 1));
+            ctx.fillStyle = shineGrad;
+            ctx.fill();
+
+            ctx.beginPath();
+            ctx.roundRect(x + 0.5, y + 0.5, w - 1, h - 1, r);
+            ctx.strokeStyle = isActive ? "#ffffff" : borderColor;
+            ctx.lineWidth = isActive ? 1.4 : 0.9;
+            ctx.stroke();
+            ctx.restore();
+        }
+
+        function drawAeroGlassPanel(x, y, w, h, r, borderTint = "rgba(165, 243, 252, 0.45)") {
+            ctx.save();
+            const g = ctx.createLinearGradient(x, y, x, y + h);
+            g.addColorStop(0, "rgba(255, 255, 255, 0.22)");
+            g.addColorStop(0.15, "rgba(255, 255, 255, 0.09)");
+            g.addColorStop(1, "rgba(4, 20, 42, 0.78)");
+
+            ctx.beginPath();
+            ctx.roundRect(x, y, w, h, r);
+            ctx.fillStyle = g;
+            ctx.fill();
+
+            const topShine = ctx.createLinearGradient(x, y, x, y + 12);
+            topShine.addColorStop(0, "rgba(255, 255, 255, 0.34)");
+            topShine.addColorStop(1, "rgba(255, 255, 255, 0.0)");
+            ctx.beginPath();
+            ctx.roundRect(x + 1, y + 1, w - 2, Math.min(12, h * 0.3), r);
+            ctx.fillStyle = topShine;
+            ctx.fill();
+
+            ctx.beginPath();
+            ctx.roundRect(x + 0.5, y + 0.5, w - 1, h - 1, r);
+            ctx.strokeStyle = borderTint;
+            ctx.lineWidth = 1;
+            ctx.stroke();
+            ctx.restore();
+        }
+
+        function drawWalkmanAeroBackground(now) {
+            const bg = ctx.createLinearGradient(0, 20, 0, 240);
+            bg.addColorStop(0, "#0b4a6f");
+            bg.addColorStop(0.5, "#072a47");
+            bg.addColorStop(1, "#031326");
+            ctx.fillStyle = bg;
+            ctx.fillRect(0, 0, 320, 240);
+
+            // Onda luminosa estilo Walkman X-Series / Aurora Frutiger Aero
+            ctx.save();
+            const aurora = ctx.createRadialGradient(170, 35, 10, 170, 65, 180);
+            aurora.addColorStop(0, "rgba(34, 211, 238, 0.32)");
+            aurora.addColorStop(0.55, "rgba(16, 185, 129, 0.14)");
+            aurora.addColorStop(1, "rgba(3, 19, 38, 0)");
+            ctx.fillStyle = aurora;
+            ctx.fillRect(0, 20, 320, 195);
+
+            AERO_BUBBLES.forEach((b, idx) => {
+                const by = ((b.y - (now * 0.007 * b.speed)) % 185 + 185) % 185 + 22;
+                const bx = b.x + Math.sin(now * 0.0012 + idx) * 5;
+                const orb = ctx.createRadialGradient(bx - b.r * 0.3, by - b.r * 0.3, 1, bx, by, b.r);
+                orb.addColorStop(0, "rgba(255, 255, 255, 0.24)");
+                orb.addColorStop(0.6, "rgba(56, 189, 248, 0.08)");
+                orb.addColorStop(1, "rgba(56, 189, 248, 0)");
+                ctx.fillStyle = orb;
+                ctx.beginPath();
+                ctx.arc(bx, by, b.r, 0, Math.PI * 2);
+                ctx.fill();
+            });
+            ctx.restore();
+        }
+
+        // 6.1 BARRA SUPERIOR COMPACTA WALKMAN AERO (Y: 0..20, 20px de alto)
+        function drawWalkmanStatusBar() {
+            const track = TRACKS[state.currentTrackIdx];
+            const barG = ctx.createLinearGradient(0, 0, 0, 20);
+            barG.addColorStop(0, "#f1f5f9");
+            barG.addColorStop(0.5, "#cbd5e1");
+            barG.addColorStop(0.52, "#94a3b8");
+            barG.addColorStop(1, "#e2e8f0");
+            ctx.fillStyle = barG;
+            ctx.fillRect(0, 0, 320, 20);
+
+            // Logo Walkman "W." en píldora azul cian (X: 3..25)
+            drawAeroGelPill(3, 2, 22, 16, 5, "#06b6d4", "#0369a1");
+            ctx.fillStyle = "#ffffff";
+            ctx.font = "900 9px 'Inter', sans-serif";
+            ctx.textBaseline = "middle";
+            ctx.fillText("W.", 8, 10);
+
+            // Formato / Fuente activa (X: 28..82)
+            const isSpot = track.format === "SPOTIFY";
+            drawAeroGelPill(28, 2, 52, 16, 7, isSpot ? "#10b981" : "#0284c7", isSpot ? "#047857" : "#0369a1");
+            ctx.fillStyle = "#ffffff";
+            ctx.font = "bold 7.5px 'JetBrains Mono', monospace";
+            ctx.fillText(track.format, 34, 10);
+
+            // Indicador de Teléfono Bluetooth (X: 84..168) -> Tocar alterna conexión
+            drawAeroGelPill(
+                84, 2, 84, 16, 7,
+                state.phoneConnected ? "#10b981" : "#64748b",
+                state.phoneConnected ? "#047857" : "#334155"
+            );
+            ctx.fillStyle = "#ffffff";
+            ctx.font = "bold 7.5px 'Inter', sans-serif";
+            ctx.fillText(state.phoneConnected ? "📱 Phone: ON" : "📵 No Phone", 92, 10);
+
+            // Indicador de Salida (Jack 3.5mm vs BT Out) (X: 171..244)
+            const isBt = state.outputMode === "BT OUT";
+            drawAeroGelPill(171, 2, 72, 16, 7, isBt ? "#0891b2" : "#334155", isBt ? "#155e75" : "#0f172a");
+            ctx.fillStyle = "#ffffff";
+            ctx.fillText(isBt ? "📡 BT Audio" : "🎧 Jack 3.5", 178, 10);
+
+            // Badge MEGA BASS (X: 246..286)
+            drawAeroGelPill(246, 2, 38, 16, 6, state.megaBass ? "#06b6d4" : "#64748b", state.megaBass ? "#0e7490" : "#334155");
+            ctx.fillStyle = "#ffffff";
+            ctx.font = "bold 7px 'JetBrains Mono', monospace";
+            ctx.fillText("BASS+", 252, 10);
+
+            // Batería 3D Glossy (X: 290..315)
+            ctx.strokeStyle = "#334155";
+            ctx.strokeRect(290.5, 4.5, 22, 11);
+            ctx.fillStyle = "#334155";
+            ctx.fillRect(313, 7, 2, 6);
+            drawAeroGelPill(292, 6, 18, 8, 2, "#4ade80", "#16a34a");
+        }
+
+        // 6.2 VISTA 1: NOW PLAYING CON GRAN PANEL DE LETRAS (.LRC) + VENTANA WALKMAN DE CRISTAL
+        function drawNowPlayingWalkmanAeroView() {
+            const track = TRACKS[state.currentTrackIdx];
+            const expanded = state.lyricsExpanded;
+
+            // --- COLUMNA IZQUIERDA (X: 5..91, Y: 23..191) -> Ventana Walkman con Carretes de Cristal + Vúmetros ---
+            if (!expanded) {
+                drawAeroGlassPanel(5, 23, 86, 168, 9);
+
+                // Mini Carátula + Ventana de Casete de Cristal Frutiger Aero (X: 10..86, Y: 28..112)
+                drawAeroGelPill(10, 28, 76, 84, 8, track.artTop, track.artBottom, "rgba(255,255,255,0.8)");
+
+                // Etiqueta superior del mini-casete Walkman
+                ctx.fillStyle = "rgba(4, 15, 30, 0.55)";
+                ctx.beginPath();
+                ctx.roundRect(14, 32, 68, 16, 4);
+                ctx.fill();
+                ctx.fillStyle = "#ffffff";
+                ctx.font = "bold 7px 'JetBrains Mono', monospace";
+                ctx.fillText("W. WALKMAN", 21, 40);
+
+                // Ventana central translúcida con 2 carretes giratorios estilo Walkman
+                ctx.fillStyle = "rgba(6, 24, 44, 0.72)";
+                ctx.beginPath();
+                ctx.roundRect(14, 52, 68, 38, 6);
+                ctx.fill();
+                ctx.strokeStyle = "rgba(165, 243, 252, 0.65)";
+                ctx.stroke();
+
+                // Dos carretes de cristal girando en tiempo real
+                [31, 65].forEach((rx) => {
+                    ctx.save();
+                    ctx.translate(rx, 71);
+                    ctx.rotate(state.reelAngle);
+                    ctx.beginPath();
+                    ctx.arc(0, 0, 11, 0, Math.PI * 2);
+                    ctx.fillStyle = "rgba(56, 189, 248, 0.28)";
+                    ctx.fill();
+                    ctx.lineWidth = 1.4;
+                    ctx.strokeStyle = "#e0f2fe";
+                    ctx.stroke();
+
+                    for (let k = 0; k < 3; k++) {
+                        ctx.rotate((Math.PI * 2) / 3);
+                        ctx.beginPath();
+                        ctx.moveTo(0, 3);
+                        ctx.lineTo(0, 10);
+                        ctx.strokeStyle = "#ffffff";
+                        ctx.stroke();
+                    }
+                    ctx.beginPath();
+                    ctx.arc(0, 0, 3, 0, Math.PI * 2);
+                    ctx.fillStyle = "#38bdf8";
+                    ctx.fill();
+                    ctx.restore();
+                });
+
+                // Badge inferior dentro de la carátula
+                ctx.fillStyle = "#ffffff";
+                ctx.font = "bold 7.5px 'Inter', sans-serif";
+                ctx.fillText("CLEAR AUDIO+", 19, 102);
+
+                // Vúmetros Estéreo L/R en cápsulas Aqua (Y: 118..164)
+                ctx.fillStyle = "#bae6fd";
+                ctx.font = "bold 7px 'JetBrains Mono', monospace";
+                ctx.fillText("L", 13, 127);
+                ctx.fillText("R", 13, 141);
+
+                drawAeroGlassPanel(22, 121, 58, 10, 4);
+                drawAeroGlassPanel(22, 135, 58, 10, 4);
+
+                const wL = Math.max(4, Math.min(56, Math.round(state.vuL * 56)));
+                const wR = Math.max(4, Math.min(56, Math.round(state.vuR * 56)));
+                drawAeroGelPill(23, 122, wL, 8, 3, "#34d399", "#0284c7");
+                drawAeroGelPill(23, 136, wR, 8, 3, "#22d3ee", "#0284c7");
+
+                // Botón rápido para ver el estado de grabación en SD / EQ
+                drawAeroGelPill(11, 152, 74, 16, 6, "#0ea5e9", "#0369a1");
+                ctx.fillStyle = "#ffffff";
+                ctx.font = "bold 7.5px 'Inter', sans-serif";
+                ctx.fillText(`EQ: ${state.presetName}`, 16, 160);
+
+                ctx.fillStyle = "#7dd3fc";
+                ctx.font = "7px 'JetBrains Mono', monospace";
+                ctx.fillText(track.bitrate.substring(0, 14), 12, 180);
+            }
+
+            // --- PANEL PRINCIPAL AMPLIO DE METADATOS + LETRAS .LRC (X: 95..315 o 5..315 si está expandido, Y: 23..191) ---
+            const lx = expanded ? 5 : 95;
+            const lw = expanded ? 310 : 220;
+            drawAeroGlassPanel(lx, 23, lw, 168, 9);
+
+            // Cabecera compacta de la canción + Botón [⛶ Letra] para ampliar/contraer (Y: 27..52)
+            ctx.fillStyle = "#ffffff";
+            ctx.font = "800 11.5px 'Inter', sans-serif";
+            const maxTitleChars = expanded ? 34 : 21;
+            ctx.fillText(track.title.substring(0, maxTitleChars), lx + 8, 35);
+
+            ctx.fillStyle = "#7dd3fc";
+            ctx.font = "600 8.5px 'Inter', sans-serif";
+            ctx.fillText(`${track.artist} • ${track.album.substring(0, expanded ? 28 : 14)}`, lx + 8, 48);
+
+            // Botón [⛶ Letra] en la esquina superior derecha del panel de letras
+            const expBtnX = lx + lw - 54;
+            drawAeroGelPill(expBtnX, 27, 48, 16, 6, expanded ? "#10b981" : "#0284c7", expanded ? "#047857" : "#0369a1");
+            ctx.fillStyle = "#ffffff";
+            ctx.font = "bold 7.5px 'Inter', sans-serif";
+            ctx.fillText(expanded ? "❐ Normal" : "⛶ Letra+", expBtnX + 6, 35);
+
+            // Línea divisoria brillante
+            ctx.strokeStyle = "rgba(125, 211, 252, 0.28)";
+            ctx.beginPath();
+            ctx.moveTo(lx + 6, 56);
+            ctx.lineTo(lx + lw - 6, 56);
+            ctx.stroke();
+
+            // --- VISOR DE 4 LÍNEAS DE LETRA SINCRONIZADA (.LRC) CON AMPLIO ESPACIO VERTICAL (Y: 60..186) ---
+            const tCur = state.trackTime % track.duration;
+            let activeIdx = 0;
+            for (let i = 0; i < track.lyrics.length; i++) {
+                if (tCur >= track.lyrics[i].time) activeIdx = i;
+            }
+
+            const prevLine = activeIdx > 0 ? track.lyrics[activeIdx - 1].text : "♪ Walkman ClearAudio+ • LRC Sync ♪";
+            const currLine = track.lyrics[activeIdx]?.text || "";
+            const nextLine1 = track.lyrics[activeIdx + 1]?.text || "♪ ... ♪";
+            const nextLine2 = track.lyrics[activeIdx + 2]?.text || "";
+
+            // Progreso dentro de la línea actual para animar el relleno líquido de la cápsula
+            const startT = track.lyrics[activeIdx]?.time || 0;
+            const endT = track.lyrics[activeIdx + 1]?.time || track.duration;
+            const lineProg = Math.max(0.08, Math.min(1, (tCur - startT) / Math.max(1, endT - startT)));
+
+            const maxChars = expanded ? 48 : 34;
+
+            // 1. Línea anterior (arriba, tenue)
+            ctx.fillStyle = "rgba(186, 230, 253, 0.52)";
+            ctx.font = "500 8.5px 'Inter', sans-serif";
+            ctx.fillText(prevLine.substring(0, maxChars), lx + 10, 69);
+
+            // 2. LÍNEA ACTUAL DESTACADA (Gran cápsula de gel Frutiger Aero con barra de progreso sílaba)
+            const capX = lx + 6, capY = 82, capW = lw - 12, capH = 44;
+            drawAeroGlassPanel(capX, capY, capW, capH, 8, "rgba(103, 232, 249, 0.85)");
+
+            // Relleno líquido de avance de la estrofa actual
+            drawAeroGelPill(
+                capX + 1, capY + 1,
+                Math.max(16, Math.round((capW - 2) * lineProg)), capH - 2,
+                7,
+                "rgba(6, 182, 212, 0.55)", "rgba(2, 132, 199, 0.72)",
+                "rgba(255,255,255,0.4)"
+            );
+
+            // Si la línea actual es larga, partirla limpiamente en 2 renglones grandes dentro de la cápsula
+            ctx.fillStyle = "#ffffff";
+            ctx.font = "800 10px 'Inter', sans-serif";
+            const splitLimit = expanded ? 42 : 28;
+            if (currLine.length <= splitLimit) {
+                ctx.fillText(currLine, capX + 8, capY + 22);
+            } else {
+                let cut = currLine.lastIndexOf(" ", splitLimit);
+                if (cut <= 0) cut = splitLimit;
+                const row1 = currLine.substring(0, cut);
+                const row2 = currLine.substring(cut).trim();
+                ctx.fillText(row1, capX + 8, capY + 15);
+                ctx.fillText(row2.substring(0, splitLimit + 4), capX + 8, capY + 31);
+            }
+
+            // 3. Siguiente línea +1
+            ctx.fillStyle = "#e0f2fe";
+            ctx.font = "600 9px 'Inter', sans-serif";
+            ctx.fillText(nextLine1.substring(0, maxChars), lx + 10, 142);
+
+            // 4. Siguiente línea +2
+            ctx.fillStyle = "rgba(147, 197, 253, 0.68)";
+            ctx.font = "500 8.5px 'Inter', sans-serif";
+            ctx.fillText(nextLine2.substring(0, maxChars), lx + 10, 162);
+
+            // Indicador inferior dentro del visor de letras
+            ctx.fillStyle = "#34d399";
+            ctx.font = "bold 7.5px 'JetBrains Mono', monospace";
+            ctx.fillText(
+                `LRC [${activeIdx + 1}/${track.lyrics.length}] • Toca la barra inferior para adelantar`,
+                lx + 10, 181
+            );
+
+            // --- BARRA DE PROGRESO LÍQUIDA AQUA DELGADA (Y: 194..210) ---
+            const barX = 42, barY = 197, barW = 236, barH = 8;
+            const ratio = Math.min(1, Math.max(0, tCur / track.duration));
+            const fmtTime = (s) => `${String(Math.floor(s / 60)).padStart(2, "0")}:${String(Math.floor(s % 60)).padStart(2, "0")}`;
+
+            ctx.fillStyle = "#bae6fd";
+            ctx.font = "bold 8px 'JetBrains Mono', monospace";
+            ctx.fillText(fmtTime(tCur), 8, 201);
+            ctx.fillText(fmtTime(track.duration), 283, 201);
+
+            drawAeroGlassPanel(barX, barY, barW, barH, 4);
+            const fillW = Math.max(8, Math.round(barW * ratio));
+            drawAeroGelPill(barX, barY, fillW, barH, 4, "#22d3ee", "#0284c7", "#bae6fd");
+
+            ctx.beginPath();
+            ctx.arc(barX + fillW, barY + barH / 2, 5, 0, Math.PI * 2);
+            ctx.fillStyle = "#ffffff";
+            ctx.fill();
+            ctx.strokeStyle = "#0284c7";
+            ctx.lineWidth = 1.5;
+            ctx.stroke();
+        }
+
+        // 6.3 VISTA 2: MENÚ WALKMAN FRUTIGER AERO MEJORADO Y CÓMODO (CON BLOQUEO DE SPOTIFY Y GUARDADO DE PLAYLISTS)
+        function drawWalkmanComfortableMenu() {
+            // Columna lateral izquierda de categorías con iconos claros (X: 5..106, Y: 23..210)
+            drawAeroGlassPanel(5, 23, 102, 187, 9);
+
+            const categories = [
+                { id: "SD",      label: "🎵 MicroSD",     sub: "4 Formatos", locked: false },
+                { id: "SPOTIFY", label: "🟢 Spotify BT",  sub: state.phoneConnected ? "Conectado" : "🔒 Sin Tel.", locked: !state.phoneConnected },
+                { id: "SAVE_SD", label: "📥 Guardar SD",  sub: state.phoneConnected ? "Playlists" : "🔒 Sin Tel.", locked: !state.phoneConnected },
+                { id: "OUTPUT",  label: "📡 Salida Audio",sub: state.outputMode === "BT OUT" ? "ESP32#2 BT" : "Jack 3.5mm", locked: false }
+            ];
+
+            categories.forEach((c, idx) => {
+                const cy = 29 + idx * 44;
+                const isSel = state.menuCategory === c.id;
+                let topC = isSel ? "#06b6d4" : "#1e293b";
+                let botC = isSel ? "#0369a1" : "#0f172a";
+                if (c.locked) {
+                    topC = "#475569";
+                    botC = "#1e293b";
+                }
+                drawAeroGelPill(10, cy, 92, 38, 8, topC, botC, "rgba(255,255,255,0.6)", isSel);
+
+                ctx.fillStyle = c.locked ? "#cbd5e1" : "#ffffff";
+                ctx.font = "bold 8.5px 'Inter', sans-serif";
+                ctx.fillText(c.label, 16, cy + 13);
+
+                ctx.fillStyle = c.locked ? "#fda4af" : "#bae6fd";
+                ctx.font = "600 7.5px 'JetBrains Mono', monospace";
+                ctx.fillText(c.sub, 16, cy + 27);
+            });
+
+            // Panel derecho amplio de contenido del menú (X: 111..315, Y: 23..210)
+            drawAeroGlassPanel(111, 23, 204, 187, 9);
+
+            if (state.menuCategory === "SD") {
+                const sdTracks = TRACKS.filter(t => t.sourceType === "MICRO SD");
+                ctx.fillStyle = "#ffffff";
+                ctx.font = "bold 9px 'Inter', sans-serif";
+                ctx.fillText(`MicroSD (${sdTracks.length} pistas)`, 118, 35);
+
+                // Botón [+ Añadir] dentro del menú MicroSD (X: 218..274, Y: 26..42)
+                drawAeroGelPill(218, 26, 56, 16, 6, "#10b981", "#047857");
+                ctx.fillStyle = "#ffffff";
+                ctx.font = "bold 7.5px 'Inter', sans-serif";
+                ctx.fillText("+ Añadir", 227, 34);
+
+                // Botones de scroll ▲ / ▼ para navegar cuando agregas más canciones (X: 277..310)
+                drawAeroGelPill(277, 26, 15, 16, 5, "#0284c7", "#0369a1");
+                drawAeroGelPill(294, 26, 15, 16, 5, "#0284c7", "#0369a1");
+                ctx.fillStyle = "#ffffff";
+                ctx.font = "bold 7px 'Inter', sans-serif";
+                ctx.fillText("▲", 281, 34);
+                ctx.fillText("▼", 298, 34);
+
+                const maxScroll = Math.max(0, sdTracks.length - 4);
+                state.sdScrollOffset = Math.min(state.sdScrollOffset, maxScroll);
+                const visibleTracks = sdTracks.slice(state.sdScrollOffset, state.sdScrollOffset + 4);
+
+                visibleTracks.forEach((tr, i) => {
+                    const ry = 46 + i * 38;
+                    const active = TRACKS[state.currentTrackIdx].id === tr.id;
+                    drawAeroGelPill(
+                        117, ry, 192, 33, 7,
+                        active ? "#0ea5e9" : "rgba(15, 23, 42, 0.75)",
+                        active ? "#0369a1" : "rgba(30, 41, 59, 0.85)",
+                        "rgba(186,230,253,0.5)", active
+                    );
+
+                    // Badge de formato (FLAC, MP3, OGG, WAV)
+                    drawAeroGelPill(122, ry + 5, 34, 14, 4, tr.artTop, tr.artBottom);
+                    ctx.fillStyle = "#ffffff";
+                    ctx.font = "bold 7px 'JetBrains Mono', monospace";
+                    ctx.fillText(tr.format, 126, ry + 12);
+
+                    ctx.fillStyle = "#ffffff";
+                    ctx.font = "bold 8.5px 'Inter', sans-serif";
+                    ctx.fillText((tr.fileUrl ? "💿 " : "") + tr.title.substring(0, 19), 161, ry + 12);
+
+                    ctx.fillStyle = "#bae6fd";
+                    ctx.font = "500 7.5px 'Inter', sans-serif";
+                    ctx.fillText(`${tr.artist.substring(0, 18)} • ${tr.bitrate.split("•")[0]}`, 122, ry + 25);
+                });
+            } else if (state.menuCategory === "SPOTIFY") {
+                ctx.fillStyle = "#34d399";
+                ctx.font = "bold 9.5px 'Inter', sans-serif";
+                ctx.fillText("🟢 Spotify Connect (A2DP + AVRCP)", 120, 35);
+
+                drawAeroGelPill(117, 46, 192, 46, 8, "#10b981", "#047857", "#a7f3d0", true);
+                ctx.fillStyle = "#ffffff";
+                ctx.font = "bold 9.5px 'Inter', sans-serif";
+                ctx.fillText("▶ Butcher Vanity (Spotify)", 125, 60);
+                ctx.font = "600 8px 'Inter', sans-serif";
+                ctx.fillText("Vane Lily feat. Yi Xi • 03:12", 125, 73);
+                ctx.font = "bold 7px 'JetBrains Mono', monospace";
+                ctx.fillText("Toca para escuchar stream BT con letra .LRC", 125, 84);
+
+                // Acceso directo a Guardar Playlist en MicroSD
+                drawAeroGlassPanel(117, 98, 192, 62, 8);
+                ctx.fillStyle = "#bae6fd";
+                ctx.font = "bold 8.5px 'Inter', sans-serif";
+                ctx.fillText("¿Guardar música de Spotify en MicroSD?", 124, 111);
+                ctx.fillStyle = "#e0f2fe";
+                ctx.font = "500 7.5px 'Inter', sans-serif";
+                ctx.fillText("Selecciona qué playlists deseas grabar", 124, 123);
+
+                drawAeroGelPill(124, 132, 178, 22, 7, "#06b6d4", "#0284c7");
+                ctx.fillStyle = "#ffffff";
+                ctx.font = "bold 8px 'Inter', sans-serif";
+                ctx.fillText("📥 Abrir Gestor de Playlists a SD →", 136, 143);
+
+                // Estado del teléfono
+                ctx.fillStyle = "#6ee7b7";
+                ctx.font = "bold 7.5px 'JetBrains Mono', monospace";
+                ctx.fillText("AVRCP Metadata + Lyrics Sync: ACTIVO", 120, 175);
+            } else if (state.menuCategory === "SAVE_SD") {
+                ctx.fillStyle = "#38bdf8";
+                ctx.font = "bold 9px 'Inter', sans-serif";
+                ctx.fillText("📥 Guardar Playlist Spotify en MicroSD", 118, 35);
+
+                ctx.fillStyle = "#fde68a";
+                ctx.font = "bold 7px 'JetBrains Mono', monospace";
+                ctx.fillText("⚡ Selecciona playlists (Grabación en pausa v1):", 118, 47);
+
+                SPOTIFY_PLAYLISTS.forEach((pl, i) => {
+                    const ry = 55 + i * 36;
+                    drawAeroGelPill(
+                        117, ry, 192, 32, 7,
+                        pl.queuedForSd ? "#0284c7" : "rgba(15, 23, 42, 0.78)",
+                        pl.queuedForSd ? "#0369a1" : "rgba(30, 41, 59, 0.88)",
+                        "rgba(186,230,253,0.45)", pl.queuedForSd
+                    );
+
+                    ctx.fillStyle = "#ffffff";
+                    ctx.font = "bold 8px 'Inter', sans-serif";
+                    ctx.fillText(pl.name.substring(0, 23), 124, ry + 11);
+
+                    ctx.fillStyle = pl.queuedForSd ? "#fde047" : "#94a3b8";
+                    ctx.font = "bold 7px 'JetBrains Mono', monospace";
+                    ctx.fillText(
+                        pl.queuedForSd
+                            ? `☑ En cola SD (${pl.tracksCount} pistas • Pausado)`
+                            : `☐ Tocar para guardar (${pl.tracksCount} pistas)`,
+                        124, ry + 23
+                    );
+                });
+            } else if (state.menuCategory === "OUTPUT") {
+                ctx.fillStyle = "#ffffff";
+                ctx.font = "bold 9.5px 'Inter', sans-serif";
+                ctx.fillText("Salida de Audio Dual (Cable / BT)", 120, 35);
+
+                const isJack = state.outputMode === "JACK 3.5";
+                drawAeroGelPill(117, 46, 192, 34, 7, isJack ? "#10b981" : "#1e293b", isJack ? "#047857" : "#0f172a", "#a7f3d0", isJack);
+                ctx.fillStyle = "#ffffff";
+                ctx.font = "bold 8.5px 'Inter', sans-serif";
+                ctx.fillText("🎧 Jack 3.5mm Cable (DAC PCM5102A)", 124, 58);
+                ctx.fillStyle = "#d1fae5";
+                ctx.font = "7.5px 'JetBrains Mono', monospace";
+                ctx.fillText("I2S 24-bit • 112dB SNR Directo", 124, 71);
+
+                BT_HEADPHONES.forEach((dev, i) => {
+                    const ry = 86 + i * 38;
+                    const activeBt = state.outputMode === "BT OUT" && state.connectedBtDevice === dev.name;
+                    drawAeroGelPill(117, ry, 192, 33, 7, activeBt ? "#06b6d4" : "#1e293b", activeBt ? "#0e7490" : "#0f172a", "#a5f3fc", activeBt);
+                    ctx.fillStyle = "#ffffff";
+                    ctx.font = "bold 8.5px 'Inter', sans-serif";
+                    ctx.fillText(`📡 ${dev.name}`, 124, ry + 12);
+                    ctx.fillStyle = "#bae6fd";
+                    ctx.font = "7px 'JetBrains Mono', monospace";
+                    ctx.fillText(`ESP32#2 A2DP Source • MAC ${dev.mac}`, 124, ry + 24);
+                });
+            }
+        }
+
+        // 6.4 VISTA 3: ECUALIZADOR WALKMAN CLEAR AUDIO+ / MEGA BASS (Y: 23..210)
+        function drawWalkmanEqualizerView() {
+            drawAeroGlassPanel(5, 23, 310, 187, 9);
+
+            ctx.fillStyle = "#ffffff";
+            ctx.font = "bold 9.5px 'Inter', sans-serif";
+            ctx.fillText("W. Walkman ClearAudio+ & Mega Bass DSP", 14, 35);
+
+            const sliders = [
+                { key: "bass",   label: "CLEAR BASS", freq: "100 Hz", val: state.eq.bass,   x: 44,  topC: "#22d3ee", botC: "#0284c7" },
+                { key: "mid",    label: "VOCAL+",     freq: "2.0 kHz",val: state.eq.mid,    x: 106, topC: "#34d399", botC: "#059669" },
+                { key: "treble", label: "TREBLE",     freq: "10 kHz", val: state.eq.treble, x: 168, topC: "#38bdf8", botC: "#0369a1" }
+            ];
+
+            const trackTop = 56, trackH = 110;
+            const centerY = trackTop + trackH / 2;
+
+            sliders.forEach((s) => {
+                ctx.fillStyle = "#bae6fd";
+                ctx.font = "bold 8px 'JetBrains Mono', monospace";
+                const dbStr = (s.val > 0 ? `+${s.val}` : `${s.val}`) + "dB";
+                ctx.fillText(dbStr, s.x - 12, 48);
+
+                drawAeroGlassPanel(s.x - 6, trackTop, 12, trackH, 6);
+
+                const knobY = centerY - (s.val / 12) * (trackH / 2);
+                const fillTop = Math.min(centerY, knobY);
+                const fillH = Math.max(6, Math.abs(knobY - centerY));
+                drawAeroGelPill(s.x - 5, fillTop, 10, fillH, 5, s.topC, s.botC);
+
+                drawAeroGelPill(s.x - 13, knobY - 6, 26, 12, 6, "#ffffff", s.topC, "#ffffff");
+
+                ctx.fillStyle = "#ffffff";
+                ctx.font = "bold 7.5px 'Inter', sans-serif";
+                ctx.fillText(s.label, s.x - 20, 178);
+                ctx.fillStyle = "#7dd3fc";
+                ctx.font = "7px 'JetBrains Mono', monospace";
+                ctx.fillText(s.freq, s.x - 14, 190);
+            });
+
+            const presets = [
+                { id: "MEGABASS", label: "Mega Bass+",   y: 50,  c1: "#06b6d4", c2: "#0369a1" },
+                { id: "VOCAL",    label: "Vocal Crystal",y: 78,  c1: "#10b981", c2: "#047857" },
+                { id: "ROCK",     label: "SynthV Punch", y: 106, c1: "#f43f5e", c2: "#be123c" },
+                { id: "FLAT",     label: "Flat Studio",  y: 134, c1: "#64748b", c2: "#334155" }
+            ];
+
+            presets.forEach((p) => {
+                drawAeroGelPill(204, p.y, 102, 22, 10, p.c1, p.c2);
+                ctx.fillStyle = "#ffffff";
+                ctx.font = "bold 8.5px 'Inter', sans-serif";
+                const tw = ctx.measureText(p.label).width;
+                ctx.fillText(p.label, 204 + (102 - tw) / 2, p.y + 11);
+            });
+
+            drawAeroGelPill(204, 166, 34, 22, 8, "#0284c7", "#0369a1");
+            drawAeroGelPill(272, 166, 34, 22, 8, "#0284c7", "#0369a1");
+            ctx.fillStyle = "#ffffff";
+            ctx.font = "bold 7.5px 'JetBrains Mono', monospace";
+            ctx.fillText("VOL-", 210, 177);
+            ctx.fillText("VOL+", 278, 177);
+            ctx.fillStyle = "#bae6fd";
+            ctx.fillText(`${state.volume}%`, 243, 177);
+        }
+
+        // 6.5 BARRA INFERIOR COMPACTA DE BOTONES PEQUEÑOS (Y: 213..239, solo 26px de alto)
+        const COMPACT_DOCK_BTNS = [
+            { id: "PREV", label: "|<<",    x: 6,   w: 42 },
+            { id: "PLAY", label: "▶/❚❚",   x: 52,  w: 50 },
+            { id: "NEXT", label: ">>|",    x: 106, w: 42 },
+            { id: "EQ",   label: "EQ",     x: 152, w: 44 },
+            { id: "SAVE", label: "💾SD",   x: 200, w: 52 },
+            { id: "MENU", label: "MENU",   x: 256, w: 58 }
+        ];
+
+        function drawCompactWalkmanDock() {
+            drawAeroGlassPanel(3, 213, 314, 25, 9);
+
+            COMPACT_DOCK_BTNS.forEach((b) => {
+                const isActive =
+                    (b.id === "PLAY" && state.isPlaying) ||
+                    (b.id === "EQ" && state.screenMode === "EQ") ||
+                    (b.id === "MENU" && state.screenMode === "MENU") ||
+                    (b.id === "SAVE" && state.screenMode === "MENU" && state.menuCategory === "SAVE_SD");
+
+                let topC = isActive ? "#10b981" : "#0ea5e9";
+                let botC = isActive ? "#047857" : "#0369a1";
+
+                drawAeroGelPill(b.x, 216, b.w, 19, 9, topC, botC, "rgba(255,255,255,0.75)", isActive);
+
+                ctx.fillStyle = "#ffffff";
+                ctx.font = "bold 8px 'Inter', sans-serif";
+                const tw = ctx.measureText(b.label).width;
+                ctx.fillText(b.label, b.x + (b.w - tw) / 2, 225.5);
+            });
+        }
+
+        // Notificación flotante tipo Cristal Frutiger Aero dentro de la pantalla ILI9341
+        function drawTftToastOverlay() {
+            if (!state.tftToastMsg || state.tftToastTimer <= 0) return;
+            drawAeroGelPill(16, 170, 288, 22, 11, "rgba(15, 23, 42, 0.92)", "rgba(3, 105, 161, 0.95)", "#67e8f9", true);
+            ctx.fillStyle = "#ffffff";
+            ctx.font = "bold 8px 'Inter', sans-serif";
+            const tw = ctx.measureText(state.tftToastMsg).width;
+            ctx.fillText(state.tftToastMsg, Math.max(22, 160 - tw / 2), 181);
+        }
+
+        function drawCoordinateGrid() {
+            if (!state.showGrid) return;
+            ctx.save();
+            ctx.strokeStyle = "rgba(255, 255, 255, 0.22)";
+            ctx.fillStyle = "#7dd3fc";
+            ctx.font = "7px 'JetBrains Mono', monospace";
+            for (let x = 0; x < 320; x += 40) {
+                ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, 240); ctx.stroke();
+                ctx.fillText(x, x + 2, 28);
+            }
+            for (let y = 0; y < 240; y += 40) {
+                ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(320, y); ctx.stroke();
+                ctx.fillText(y, 2, y + 8);
+            }
+            ctx.restore();
+        }
+
+        /***********************************************************************
+         * 7. LOOP PRINCIPAL DE ANIMACIÓN (320x240)
+         ***********************************************************************/
+        let lastTime = performance.now();
+
+        function renderLoop(now) {
+            const dt = (now - lastTime) / 1000;
+            lastTime = now;
+
+            if (state.tftToastTimer > 0) {
+                state.tftToastTimer = Math.max(0, state.tftToastTimer - dt);
+            }
+
+            const track = TRACKS[state.currentTrackIdx];
+            if (state.isPlaying) {
+                if (!state.usingUploadedAudio && state.draggingSlider !== "scrubber") {
+                    state.trackTime = (state.trackTime + dt) % track.duration;
+                }
+                state.reelAngle += dt * 2.6;
+
+                const bassBoost = 1 + (state.eq.bass + 12) / 20;
+                const targetL = Math.min(1, (0.42 + Math.abs(Math.sin(now * 0.014)) * 0.45) * bassBoost * (state.volume / 90));
+                const targetR = Math.min(1, (0.38 + Math.abs(Math.cos(now * 0.011)) * 0.48) * bassBoost * (state.volume / 90));
+                state.vuL = state.vuL * 0.7 + targetL * 0.3;
+                state.vuR = state.vuR * 0.7 + targetR * 0.3;
+            } else {
+                state.vuL *= 0.85;
+                state.vuR *= 0.85;
+            }
+
+            drawWalkmanAeroBackground(now);
+            drawWalkmanStatusBar();
+
+            if (state.screenMode === "PLAYER") {
+                drawNowPlayingWalkmanAeroView();
+            } else if (state.screenMode === "MENU") {
+                drawWalkmanComfortableMenu();
+            } else if (state.screenMode === "EQ") {
+                drawWalkmanEqualizerView();
+            }
+
+            drawCompactWalkmanDock();
+            drawTftToastOverlay();
+            drawCoordinateGrid();
+
+            requestAnimationFrame(renderLoop);
+        }
+
+        /***********************************************************************
+         * 8. INTERACCIÓN TÁCTIL XPT2046 EN EL LIENZO DE 320x240
+         ***********************************************************************/
+        function getCanvasCoords(evt) {
+            const rect = canvas.getBoundingClientRect();
+            const clientX = evt.touches ? evt.touches[0].clientX : evt.clientX;
+            const clientY = evt.touches ? evt.touches[0].clientY : evt.clientY;
+            const x = Math.max(0, Math.min(319, Math.floor(((clientX - rect.left) / rect.width) * 320)));
+            const y = Math.max(0, Math.min(239, Math.floor(((clientY - rect.top) / rect.height) * 240)));
+            return { x, y };
+        }
+
+        function updateTouchInspector(x, y, zone, snippet) {
+            document.getElementById("touchCoordBadge").textContent = `TOUCH XPT2046: X:${x} Y:${y}`;
+            document.getElementById("inspectorXY").textContent = `X:${x}, Y:${y}`;
+            document.getElementById("inspectorZone").textContent = `WIDGET: ${zone}`;
+            if (snippet) document.getElementById("arduinoSnippet").textContent = snippet;
+        }
+
+        function handleTouchDown(evt) {
+            evt.preventDefault();
+            const { x, y } = getCanvasCoords(evt);
+            const track = TRACKS[state.currentTrackIdx];
+
+            // 1. Barra Superior (Y: 0..20)
+            if (y <= 20) {
+                if (x >= 84 && x <= 168) {
+                    togglePhoneConnection();
+                    updateTouchInspector(x, y, "BT_PHONE_TOGGLE", "// Verificar si hay smartphone conectado por A2DP\nbool phoneLinked = a2dp_sink.is_connected();");
+                    return;
+                }
+                if (x >= 171 && x <= 243) {
+                    toggleOutputMode();
+                    updateTouchInspector(x, y, "AUDIO_OUTPUT_MODE", "// Cambiar entre DAC PCM5102A (3.5mm) y ESP32#2 BT");
+                    return;
+                }
+                if (x >= 246 && x <= 286) {
+                    state.megaBass = !state.megaBass;
+                    syncDspParameters();
+                    playWalkmanClick(1100);
+                    showTftToast(state.megaBass ? "🔊 Walkman MEGA BASS: ON" : "MEGA BASS: OFF");
+                    return;
+                }
+            }
+
+            // 2. Barra Inferior Compacta (Y: 213..239)
+            if (y >= 213) {
+                for (const b of COMPACT_DOCK_BTNS) {
+                    if (x >= b.x && x <= b.x + b.w) {
+                        updateTouchInspector(x, y, `DOCK_BTN_${b.id}`, `// Botón compacto Walkman (altura 19px)\ndrawAeroPill(${b.x}, 216, ${b.w}, 19, 9);`);
+                        if (b.id === "PREV") prevTrack();
+                        else if (b.id === "PLAY") togglePlayPause();
+                        else if (b.id === "NEXT") nextTrack();
+                        else if (b.id === "EQ") switchScreenMode(state.screenMode === "EQ" ? "PLAYER" : "EQ");
+                        else if (b.id === "SAVE") openMenuCategory("SAVE_SD");
+                        else if (b.id === "MENU") switchScreenMode(state.screenMode === "MENU" ? "PLAYER" : "MENU");
+                        return;
+                    }
+                }
+            }
+
+            // 3. Vista NOW PLAYING
+            if (state.screenMode === "PLAYER") {
+                const lx = state.lyricsExpanded ? 5 : 95;
+                const lw = state.lyricsExpanded ? 310 : 220;
+                const expBtnX = lx + lw - 54;
+
+                // Botón [⛶ Letra+] para expandir o contraer el panel de letras .LRC
+                if (x >= expBtnX && x <= expBtnX + 48 && y >= 25 && y <= 46) {
+                    state.lyricsExpanded = !state.lyricsExpanded;
+                    playWalkmanClick(1320);
+                    updateTouchInspector(x, y, "EXPAND_LYRICS_BTN", "// Ampliar visor de letras .LRC a pantalla completa\nlyricsExpanded = !lyricsExpanded;");
+                    return;
+                }
+
+                // Barra de progreso líquida Aqua (X: 42..278, Y: 190..210)
+                if (x >= 42 && x <= 278 && y >= 190 && y <= 212) {
+                    state.draggingSlider = "scrubber";
+                    const ratio = (x - 42) / 236;
+                    state.trackTime = ratio * track.duration;
+                    if (state.usingUploadedAudio && htmlAudioElement) {
+                        htmlAudioElement.currentTime = state.trackTime;
+                    }
+                    playWalkmanClick(1200);
+                    updateTouchInspector(x, y, "AQUA_PROGRESS_BAR", "// Salto temporal sincronizado con el parser .LRC\nseekTrackTo(ratio * trackDuration);");
+                    return;
+                }
+
+                // Tocar la ventana de carretes Walkman a la izquierda alterna Play/Pause
+                if (!state.lyricsExpanded && x >= 10 && x <= 86 && y >= 28 && y <= 112) {
+                    togglePlayPause();
+                    updateTouchInspector(x, y, "WALKMAN_CRYSTAL_REELS", "// Ventana de carretes Walkman en TFT_eSprite\nupdateSpinningReels(reelAngle);");
+                    return;
+                }
+            }
+
+            // 4. Vista MENÚ MEJORADO
+            if (state.screenMode === "MENU") {
+                // Categorías de la barra lateral izquierda (X: 5..106)
+                if (x >= 5 && x <= 106) {
+                    const cats = ["SD", "SPOTIFY", "SAVE_SD", "OUTPUT"];
+                    for (let i = 0; i < cats.length; i++) {
+                        const cy = 29 + i * 44;
+                        if (y >= cy && y <= cy + 38) {
+                            openMenuCategory(cats[i]);
+                            updateTouchInspector(x, y, `MENU_CAT_${cats[i]}`, `// Selección de categoría con bloqueo de Spotify si !phoneConnected`);
+                            return;
+                        }
+                    }
+                }
+
+                // Contenido derecho del menú (X: 115..310)
+                if (x >= 115 && x <= 310) {
+                    if (state.menuCategory === "SD") {
+                        const sdTracks = TRACKS.filter(t => t.sourceType === "MICRO SD");
+                        // Botón [+ Añadir] en la cabecera del menú MicroSD (X: 218..274, Y: 26..42)
+                        if (y >= 24 && y <= 44) {
+                            if (x >= 218 && x <= 274) {
+                                playWalkmanClick(1360);
+                                document.getElementById("localAudioInput").click();
+                                updateTouchInspector(x, y, "SD_ADD_SONG_BTN", "// Abrir gestor de carga MicroSD / Wi-Fi Upload");
+                                return;
+                            }
+                            if (x >= 277 && x <= 292) {
+                                state.sdScrollOffset = Math.max(0, state.sdScrollOffset - 1);
+                                playWalkmanClick(1100);
+                                return;
+                            }
+                            if (x >= 294 && x <= 310) {
+                                state.sdScrollOffset = Math.min(Math.max(0, sdTracks.length - 4), state.sdScrollOffset + 1);
+                                playWalkmanClick(1100);
+                                return;
+                            }
+                        }
+                        const visibleTracks = sdTracks.slice(state.sdScrollOffset, state.sdScrollOffset + 4);
+                        for (let i = 0; i < visibleTracks.length; i++) {
+                            const ry = 46 + i * 38;
+                            if (y >= ry && y <= ry + 33) {
+                                const realIdx = TRACKS.findIndex(t => t.id === visibleTracks[i].id);
+                                selectTrack(realIdx);
+                                state.screenMode = "PLAYER";
+                                return;
+                            }
+                        }
+                    } else if (state.menuCategory === "SPOTIFY") {
+                        if (y >= 46 && y <= 92) {
+                            selectTrack(1); // Butcher Vanity en modo Spotify BT
+                            state.screenMode = "PLAYER";
+                            return;
+                        }
+                        if (y >= 130 && y <= 156) {
+                            openMenuCategory("SAVE_SD");
+                            return;
+                        }
+                    } else if (state.menuCategory === "SAVE_SD") {
+                        for (let i = 0; i < SPOTIFY_PLAYLISTS.length; i++) {
+                            const ry = 55 + i * 36;
+                            if (y >= ry && y <= ry + 32) {
+                                toggleQueuePlaylistForSd(i);
+                                updateTouchInspector(x, y, `QUEUE_PLAYLIST_SD_${i}`, `// Encolar playlist de Spotify para grabación futura en MicroSD\nplaylistQueue[${i}].saveToSd = true;`);
+                                return;
+                            }
+                        }
+                    } else if (state.menuCategory === "OUTPUT") {
+                        if (y >= 46 && y <= 80) {
+                            state.outputMode = "JACK 3.5";
+                            playWalkmanClick(1080);
+                            updateHardwareBadges();
+                            showTftToast("🎧 Salida: Cable Jack 3.5mm (PCM5102A)");
+                            return;
+                        }
+                        for (let i = 0; i < BT_HEADPHONES.length; i++) {
+                            const ry = 86 + i * 38;
+                            if (y >= ry && y <= ry + 33) {
+                                state.connectedBtDevice = BT_HEADPHONES[i].name;
+                                state.outputMode = "BT OUT";
+                                playWalkmanClick(1380);
+                                updateHardwareBadges();
+                                showTftToast(`📡 Conectado a ${BT_HEADPHONES[i].name}`);
+                                logUart("UART_TX", `AT+BTCONN="${BT_HEADPHONES[i].mac}" (${BT_HEADPHONES[i].name})`);
+                                return;
+                            }
+                        }
+                    }
+                }
+            }
+
+            // 5. Vista ECUALIZADOR
+            if (state.screenMode === "EQ") {
+                if (y >= 52 && y <= 170) {
+                    if (Math.abs(x - 44) <= 20) { state.draggingSlider = "bass"; updateEqFromTouch(y); return; }
+                    if (Math.abs(x - 106) <= 20) { state.draggingSlider = "mid"; updateEqFromTouch(y); return; }
+                    if (Math.abs(x - 168) <= 20) { state.draggingSlider = "treble"; updateEqFromTouch(y); return; }
+                }
+                if (x >= 204 && x <= 306) {
+                    if (y >= 50 && y <= 72) { applyEqPreset("MEGABASS"); return; }
+                    if (y >= 78 && y <= 100) { applyEqPreset("VOCAL"); return; }
+                    if (y >= 106 && y <= 128) { applyEqPreset("ROCK"); return; }
+                    if (y >= 134 && y <= 156) { applyEqPreset("FLAT"); return; }
+                }
+                if (y >= 166 && y <= 188) {
+                    if (x >= 204 && x <= 238) { setMasterVolume(state.volume - 10); playWalkmanClick(920); return; }
+                    if (x >= 272 && x <= 306) { setMasterVolume(state.volume + 10); playWalkmanClick(1350); return; }
+                }
+            }
+
+            updateTouchInspector(x, y, "WALKMAN_AERO_SURFACE", `// Touch en X=${x}, Y=${y}`);
+        }
+
+        function updateEqFromTouch(y) {
+            const trackTop = 56, trackH = 110;
+            const clamped = Math.max(trackTop, Math.min(trackTop + trackH, y));
+            const ratio = 1 - (clamped - trackTop) / trackH;
+            const db = Math.round(ratio * 24 - 12);
+            updateEqBand(state.draggingSlider, db);
+        }
+
+        function handleTouchMove(evt) {
+            const { x, y } = getCanvasCoords(evt);
+            document.getElementById("touchCoordBadge").textContent = `TOUCH XPT2046: X:${x} Y:${y}`;
+            if (!state.draggingSlider) return;
+            evt.preventDefault();
+            const track = TRACKS[state.currentTrackIdx];
+            if (state.draggingSlider === "scrubber") {
+                const ratio = Math.max(0, Math.min(1, (x - 42) / 236));
+                state.trackTime = ratio * track.duration;
+                if (state.usingUploadedAudio && htmlAudioElement) {
+                    htmlAudioElement.currentTime = state.trackTime;
+                }
+            } else {
+                updateEqFromTouch(y);
+            }
+        }
+
+        function handleTouchUp() {
+            state.pressedButton = null;
+            state.draggingSlider = null;
+        }
+
+        canvas.addEventListener("mousedown", handleTouchDown);
+        canvas.addEventListener("mousemove", handleTouchMove);
+        window.addEventListener("mouseup", handleTouchUp);
+
+        canvas.addEventListener("touchstart", handleTouchDown, { passive: false });
+        canvas.addEventListener("touchmove", handleTouchMove, { passive: false });
+        window.addEventListener("touchend", handleTouchUp);
+
+        // SOPORTE GLOBAL DRAG & DROP PARA ARCHIVOS .FLAC / .MP3 / .WAV / .OGG / .LRC
+        let dragDepth = 0;
+        const dropOverlay = document.getElementById("dropOverlay");
+
+        window.addEventListener("dragenter", (e) => {
+            e.preventDefault();
+            dragDepth++;
+            dropOverlay.classList.remove("hidden");
+            dropOverlay.classList.add("flex");
+        });
+
+        window.addEventListener("dragover", (e) => {
+            e.preventDefault();
+            e.dataTransfer.dropEffect = "copy";
+        });
+
+        window.addEventListener("dragleave", (e) => {
+            e.preventDefault();
+            dragDepth = Math.max(0, dragDepth - 1);
+            if (dragDepth === 0) {
+                dropOverlay.classList.add("hidden");
+                dropOverlay.classList.remove("flex");
+            }
+        });
+
+        window.addEventListener("drop", (e) => {
+            e.preventDefault();
+            dragDepth = 0;
+            dropOverlay.classList.add("hidden");
+            dropOverlay.classList.remove("flex");
+            if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+                processIncomingFiles(e.dataTransfer.files);
+            }
+        });
+
+        window.onload = function () {
+            logUart("BOOT", "Sony Walkman × Frutiger Aero UI iniciada en ILI9341 (320x240)");
+            logUart("TRACK_0", "Pista activa: Butcher Vanity - Vane Lily feat. Yi Xi [03:12]");
+            logUart("SPOTIFY_GUARD", "Bloqueo condicional de Spotify activo (requiere Teléfono BT)");
+            updateDspSidePanel();
+            updateHardwareBadges();
+            renderQueuedPlaylistsSidebar();
+            requestAnimationFrame(renderLoop);
+        };
+    </script>
+</body>
+</html>
